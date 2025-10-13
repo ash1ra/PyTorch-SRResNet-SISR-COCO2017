@@ -1,0 +1,9 @@
+[project]
+name = "SRResNet-SuperResolution-COCO2017"
+version = "0.1.0"
+description = "PyTorch Super Resolution Residual Network trained on the COCO2017 dataset"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "torch>=2.8.0",
+]
