@@ -5,5 +5,7 @@ description = "PyTorch Super Resolution Residual Network trained on the COCO2017
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "numpy>=2.3.3",
     "torch>=2.8.0",
+    "torchvision>=0.23.0",
 ]
