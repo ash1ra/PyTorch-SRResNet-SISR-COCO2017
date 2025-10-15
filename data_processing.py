@@ -13,10 +13,12 @@ class SRDataset(Dataset):
         data_folder: str,
         scaling_factor: int,
         crop_size: int,
+        test_mode: bool = False,
         dev_mode: bool = False,
     ) -> None:
         self.scaling_factor = scaling_factor
         self.crop_size = crop_size
+        self.test_mode = test_mode
         self.images = []
 
         for img_path in Path(data_folder).iterdir():
@@ -38,5 +40,8 @@ class SRDataset(Dataset):
 
     def __getitem__(self, i: int) -> tuple[Tensor, Tensor]:
         return transform_image(
-            self.images[i], scaling_factor=self.scaling_factor, crop_size=self.crop_size
+            self.images[i],
+            scaling_factor=self.scaling_factor,
+            crop_size=self.crop_size,
+            test_mode=self.test_mode,
         )
