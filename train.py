@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Literal
 
 import torch
@@ -8,6 +9,7 @@ from tqdm import tqdm
 
 from data_processing import SRDataset
 from model import SRResNet
+from utils import load_checkpoint, save_checkpoint
 
 SCALING_FACTOR = 4
 CROP_SIZE = 96
@@ -20,8 +22,14 @@ SMALL_KERNEL_SIZE = 3
 BATCH_SIZE = 32
 LEARNING_RATE = 1e-4
 EPOCHS = 10
+LOAD_MODEL = False
 
 NUM_WORKERS = 8
+
+CHECKPOINTS_DIR = Path("checkpoints")
+MODEL_NAME = "srresnet"
+MODEL_CHECKPOINT_PATH = CHECKPOINTS_DIR / f"{MODEL_NAME}_model.safetensors"
+STATE_CHECKPOINT_PATH = CHECKPOINTS_DIR / f"{MODEL_NAME}_state.pth"
 
 
 def train_step(
@@ -29,7 +37,7 @@ def train_step(
     model: nn.Module,
     loss_fn: nn.Module,
     optimizer: optim.Optimizer,
-    scaler: GradScaler,
+    scaler: GradScaler | None,
     device: Literal["cpu", "cuda"] = "cpu",
 ) -> float:
     train_loss = 0
@@ -41,7 +49,11 @@ def train_step(
         hr_image_tensor = hr_image_tensor.to(device, non_blocking=True)
         lr_image_tensor = lr_image_tensor.to(device, non_blocking=True)
 
-        with autocast(device):
+        if scaler:
+            with autocast(device):
+                preds = model(lr_image_tensor)
+                loss = loss_fn(preds, hr_image_tensor)
+        else:
             preds = model(lr_image_tensor)
             loss = loss_fn(preds, hr_image_tensor)
 
@@ -49,12 +61,13 @@ def train_step(
 
         optimizer.zero_grad()
 
-        scaler.scale(loss).backward()
-        scaler.step(optimizer)
-        scaler.update()
-
-        # loss.backward()
-        # optimizer.step()
+        if scaler:
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
+        else:
+            loss.backward()
+            optimizer.step()
 
     train_loss /= len(data_loader)
 
@@ -66,18 +79,39 @@ def train(
     model: nn.Module,
     loss_fn: nn.Module,
     optimizer: optim.Optimizer,
+    start_epoch: int,
     epochs: int,
+    scaler: GradScaler | None = None,
     device: Literal["cpu", "cuda"] = "cpu",
 ) -> None:
-    scaler = GradScaler(device)
+    try:
+        progress_bar = tqdm(range(start_epoch, epochs + 1), desc="Epochs", leave=True)
 
-    progress_bar = tqdm(range(1, epochs + 1), desc="Epochs", leave=True)
+        for epoch in progress_bar:
+            train_loss = train_step(
+                data_loader, model, loss_fn, optimizer, scaler, device
+            )
+            progress_bar.set_postfix({"loss": f"{train_loss:.4f}"})
+            print()
 
-    for epoch in progress_bar:
-        train_loss = train_step(data_loader, model, loss_fn, optimizer, scaler, device)
-        progress_bar.set_postfix({"loss": f"{train_loss:.4f}"})
-        print()
-        # print(f"Epoch: {epoch} | Train loss: {train_loss:.4f}")
+            save_checkpoint(
+                MODEL_CHECKPOINT_PATH,
+                STATE_CHECKPOINT_PATH,
+                epoch,
+                model,
+                optimizer,
+                scaler,
+            )
+    except KeyboardInterrupt:
+        save_checkpoint(
+            MODEL_CHECKPOINT_PATH,
+            STATE_CHECKPOINT_PATH,
+            epoch,
+            model,
+            optimizer,
+            scaler,
+        )
+        exit(0)
 
 
 def main() -> None:
@@ -87,7 +121,7 @@ def main() -> None:
         data_folder="data/COCO2017_train",
         scaling_factor=SCALING_FACTOR,
         crop_size=CROP_SIZE,
-        # dev_mode=True,
+        dev_mode=True,
     )
 
     data_loader = DataLoader(
@@ -108,8 +142,30 @@ def main() -> None:
 
     loss_fn = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
+    scaler = GradScaler(device)
 
-    train(data_loader, model, loss_fn, optimizer, EPOCHS, device)
+    if LOAD_MODEL:
+        start_epoch = load_checkpoint(
+            MODEL_CHECKPOINT_PATH,
+            STATE_CHECKPOINT_PATH,
+            model,
+            optimizer,
+            scaler,
+            device,
+        )
+    else:
+        start_epoch = 1
+
+    train(
+        data_loader=data_loader,
+        model=model,
+        loss_fn=loss_fn,
+        optimizer=optimizer,
+        start_epoch=start_epoch,
+        epochs=EPOCHS,
+        scaler=scaler,
+        device=device,
+    )
 
 
 if __name__ == "__main__":

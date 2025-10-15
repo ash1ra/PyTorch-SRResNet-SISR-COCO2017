@@ -1,7 +1,10 @@
 from pathlib import Path
+from typing import Literal
 
 import torch
-from torch import Tensor
+from safetensors.torch import load_file, save_file
+from torch import Tensor, nn, optim
+from torch.amp import GradScaler
 from torchvision.io import decode_image
 from torchvision.transforms import InterpolationMode
 from torchvision.transforms import v2 as transforms
@@ -36,3 +39,45 @@ def transform_image(
     lr_img_tensor = lr_transform(img_tensor)
 
     return hr_img_tensor, lr_img_tensor
+
+
+def save_checkpoint(
+    model_filepath: str,
+    state_filepath: str,
+    epoch: int,
+    model: nn.Module,
+    optimizer: optim.Optimizer,
+    scaler: GradScaler | None = None,
+) -> None:
+    Path(model_filepath).parent.mkdir(parents=True, exist_ok=True)
+
+    state_dict = {
+        "optimizer_state_dict": optimizer.state_dict(),
+        "epoch": epoch,
+    }
+
+    if scaler:
+        state_dict["scaler_state_dict"] = scaler.state_dict()
+
+    save_file(model.state_dict(), model_filepath)
+    torch.save(state_dict, state_filepath)
+
+
+def load_checkpoint(
+    model_filepath: str,
+    state_filepath: str,
+    model: nn.Module,
+    optimizer: optim.Optimizer,
+    scaler: GradScaler | None = None,
+    device: Literal["cpu", "cuda"] = "cpu",
+) -> int:
+    if Path(model_filepath).exists() and Path(state_filepath).exists():
+        model.load_state_dict(load_file(model_filepath, device=device))
+
+        checkpoint_dict = torch.load(state_filepath, map_location=device)
+
+        optimizer.load_state_dict(checkpoint_dict["optimizer_state_dict"])
+        if scaler and "scaler_state_dict" in checkpoint_dict:
+            scaler.load_state_dict(checkpoint_dict["scaler_state_dict"])
+
+    return checkpoint_dict["epoch"]
