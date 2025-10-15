@@ -103,8 +103,10 @@ class SRResNet(nn.Module):
         )
 
         self.res_blocks = nn.Sequential(
-            *[ResBlock(n_channels=n_channels, kernel_size=small_kernel_size)]
-            * n_res_blocks
+            *[
+                ResBlock(n_channels=n_channels, kernel_size=small_kernel_size)
+                for _ in range(n_res_blocks)
+            ]
         )
 
         self.conv_block2 = ConvBlock(
@@ -121,8 +123,8 @@ class SRResNet(nn.Module):
                     kernel_size=small_kernel_size,
                     scaling_factor=2,
                 )
+                for _ in range(int(math.log2(scaling_factor)))
             ]
-            * int(math.log2(scaling_factor))
         )
 
         self.conv_block3 = ConvBlock(
