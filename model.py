@@ -102,9 +102,10 @@ class SRResNet(nn.Module):
             activation="prelu",
         )
 
-        self.res_blocks = [
-            ResBlock(n_channels=n_channels, kernel_size=small_kernel_size)
-        ] * n_res_blocks
+        self.res_blocks = nn.Sequential(
+            *[ResBlock(n_channels=n_channels, kernel_size=small_kernel_size)]
+            * n_res_blocks
+        )
 
         self.conv_block2 = ConvBlock(
             in_channels=n_channels,
@@ -113,13 +114,16 @@ class SRResNet(nn.Module):
             norm_layer=True,
         )
 
-        self.subpixel_conv_blocks = [
-            SubPixelConvBlock(
-                n_channels=n_channels,
-                kernel_size=small_kernel_size,
-                scaling_factor=2,
-            )
-        ] * int(math.log2(scaling_factor))
+        self.subpixel_conv_blocks = nn.Sequential(
+            *[
+                SubPixelConvBlock(
+                    n_channels=n_channels,
+                    kernel_size=small_kernel_size,
+                    scaling_factor=2,
+                )
+            ]
+            * int(math.log2(scaling_factor))
+        )
 
         self.conv_block3 = ConvBlock(
             in_channels=n_channels,

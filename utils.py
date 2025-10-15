@@ -6,17 +6,18 @@ from torchvision.io import decode_image
 
 
 def transform_image(
-    img_path: Path, scaling_factor: int, min_size: int
+    img_path: Path, scaling_factor: int, crop_size: int
 ) -> tuple[Tensor, Tensor]:
-    img_tensor = decode_image(img_path.__fspath__()).float() / 255.0
+    img_tensor = decode_image(img_path.__fspath__()) / 255.0 * 2.0 - 1.0
 
-    hr_transform = transforms.RandomCrop((min_size, min_size))
+    hr_transform = transforms.RandomCrop(size=(crop_size, crop_size))
     lr_transform = transforms.Compose(
         [
-            transforms.CenterCrop((min_size, min_size)),
+            transforms.CenterCrop(size=(crop_size, crop_size)),
             transforms.Resize(
-                (min_size // scaling_factor, min_size // scaling_factor),
+                size=(crop_size // scaling_factor, crop_size // scaling_factor),
                 interpolation=transforms.InterpolationMode.BICUBIC,
+                antialias=True,
             ),
         ]
     )
