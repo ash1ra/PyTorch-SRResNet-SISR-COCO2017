@@ -21,8 +21,9 @@ SMALL_KERNEL_SIZE = 3
 
 BATCH_SIZE = 32
 LEARNING_RATE = 1e-4
-EPOCHS = 100
+EPOCHS = 10
 LOAD_MODEL = True
+DEV_MODE = True
 
 NUM_WORKERS = 8
 
@@ -40,11 +41,12 @@ def train_step(
     scaler: GradScaler | None,
     device: Literal["cpu", "cuda"] = "cpu",
 ) -> float:
-    train_loss = 0
+    total_loss = 0
+
     model.train()
 
-    for i, (hr_image_tensor, lr_image_tensor) in enumerate(
-        tqdm(data_loader, desc="Training", leave=False)
+    for hr_image_tensor, lr_image_tensor in tqdm(
+        data_loader, desc="Training", leave=False
     ):
         hr_image_tensor = hr_image_tensor.to(device, non_blocking=True)
         lr_image_tensor = lr_image_tensor.to(device, non_blocking=True)
@@ -57,7 +59,7 @@ def train_step(
             preds = model(lr_image_tensor)
             loss = loss_fn(preds, hr_image_tensor)
 
-        train_loss += loss.item()
+        total_loss += loss.item()
 
         optimizer.zero_grad()
 
@@ -69,9 +71,9 @@ def train_step(
             loss.backward()
             optimizer.step()
 
-    train_loss /= len(data_loader)
+    total_loss /= len(data_loader)
 
-    return train_loss
+    return total_loss
 
 
 def train(
@@ -121,7 +123,7 @@ def main() -> None:
         data_folder="data/COCO2017_train",
         scaling_factor=SCALING_FACTOR,
         crop_size=CROP_SIZE,
-        # dev_mode=True,
+        dev_mode=DEV_MODE,
     )
 
     data_loader = DataLoader(
@@ -142,7 +144,7 @@ def main() -> None:
 
     loss_fn = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
-    scaler = GradScaler(device)
+    scaler = GradScaler(device) if device == "cuda" else None
 
     if LOAD_MODEL:
         start_epoch = load_checkpoint(

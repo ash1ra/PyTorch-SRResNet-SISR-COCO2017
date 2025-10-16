@@ -63,6 +63,9 @@ def save_checkpoint(
     scaler: GradScaler | None = None,
 ) -> None:
     Path(model_filepath).parent.mkdir(parents=True, exist_ok=True)
+    Path(state_filepath).parent.mkdir(parents=True, exist_ok=True)
+
+    save_file(model.state_dict(), model_filepath)
 
     state_dict = {
         "optimizer_state_dict": optimizer.state_dict(),
@@ -72,7 +75,6 @@ def save_checkpoint(
     if scaler:
         state_dict["scaler_state_dict"] = scaler.state_dict()
 
-    save_file(model.state_dict(), model_filepath)
     torch.save(state_dict, state_filepath)
 
 
@@ -93,4 +95,5 @@ def load_checkpoint(
         if scaler and "scaler_state_dict" in checkpoint_dict:
             scaler.load_state_dict(checkpoint_dict["scaler_state_dict"])
 
-    return checkpoint_dict["epoch"]
+        return checkpoint_dict["epoch"]
+    return 1
