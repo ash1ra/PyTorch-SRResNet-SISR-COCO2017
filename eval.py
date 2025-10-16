@@ -6,7 +6,7 @@ import torchvision.transforms.v2 as transforms
 from torchvision.io import decode_image
 
 from model import SRResNet
-from utils import load_checkpoint
+from utils import compare_images, load_checkpoint
 
 INPUT_PATH = Path.home() / "Downloads/1.jpg"
 OUTPUT_PATH = Path("result.png")
@@ -71,6 +71,8 @@ def upscale_image(
 
     with torch.inference_mode():
         upscaled_tensor = model(img_tensor)
+
+    compare_images(img_tensor, upscaled_tensor, "comparison_image.png")
 
     upscaled_tensor = (upscaled_tensor + 1) / 2
     upscaled_tensor = upscaled_tensor.clamp(0, 1) * 255

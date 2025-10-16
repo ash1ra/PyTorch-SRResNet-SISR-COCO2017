@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Literal
 
 import torch
+from PIL import Image, ImageDraw, ImageFont
 from safetensors.torch import load_file, save_file
 from torch import Tensor, nn, optim
 from torch.amp import GradScaler
@@ -97,3 +98,60 @@ def load_checkpoint(
 
         return checkpoint_dict["epoch"]
     return 1
+
+
+def compare_images(
+    hr_img_tensor: Tensor,
+    sr_img_tensor: Tensor,
+    output_path: str | Path,
+) -> None:
+    hr_label = "Original"
+    sr_label = "Upscaled"
+
+    hr_img_tensor = (hr_img_tensor + 1) / 2
+    hr_img_tensor = hr_img_tensor.clamp(0, 1) * 255
+    hr_img_tensor.squeeze_(0)
+
+    sr_img_tensor = (sr_img_tensor + 1) / 2
+    sr_img_tensor = sr_img_tensor.clamp(0, 1) * 255
+    sr_img_tensor.squeeze_(0)
+
+    to_pil_transform = transforms.ToPILImage()
+    hr_img = to_pil_transform(hr_img_tensor.byte())
+    sr_img = to_pil_transform(sr_img_tensor.byte())
+
+    width, height = hr_img.size
+    sr_img = sr_img.resize((width, height), Image.Resampling.BICUBIC)
+
+    total_width = width
+    total_height = height * 2 + 100
+    comparison_img = Image.new("RGB", (total_width, total_height), color="white")
+
+    comparison_img.paste(hr_img, (0, 50))
+    comparison_img.paste(sr_img, (0, height + 100))
+
+    draw = ImageDraw.Draw(comparison_img)
+
+    try:
+        font = ImageFont.truetype(
+            "/usr/share/fonts/TTF/JetBrainsMonoNerdFont-Regular.ttf", size=18
+        )
+    except OSError:
+        font = ImageFont.load_default()
+
+    draw.text(
+        (width // 2 - len(hr_label) * 5, 15),
+        hr_label,
+        fill="black",
+        font=font,
+    )
+    draw.text(
+        (width // 2 - len(sr_label) * 5, height + 65),
+        sr_label,
+        fill="black",
+        font=font,
+    )
+
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    comparison_img.save(output_path, format="PNG")
