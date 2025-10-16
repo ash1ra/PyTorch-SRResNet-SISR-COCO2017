@@ -11,7 +11,7 @@ from data_processing import SRDataset
 from model import SRResNet
 from utils import load_checkpoint, save_checkpoint
 
-SCALING_FACTOR = 4
+SCALING_FACTOR: Literal[2, 4, 8] = 4
 CROP_SIZE = 96
 
 N_CHANNELS = 64
@@ -21,8 +21,8 @@ SMALL_KERNEL_SIZE = 3
 
 BATCH_SIZE = 32
 LEARNING_RATE = 1e-4
-EPOCHS = 10
-LOAD_MODEL = False
+EPOCHS = 100
+LOAD_MODEL = True
 
 NUM_WORKERS = 8
 
@@ -121,7 +121,7 @@ def main() -> None:
         data_folder="data/COCO2017_train",
         scaling_factor=SCALING_FACTOR,
         crop_size=CROP_SIZE,
-        dev_mode=True,
+        # dev_mode=True,
     )
 
     data_loader = DataLoader(

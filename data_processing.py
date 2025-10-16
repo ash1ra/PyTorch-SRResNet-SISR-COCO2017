@@ -1,8 +1,9 @@
 from pathlib import Path
+from typing import Literal
 
+from PIL import Image
 from torch import Tensor
 from torch.utils.data import Dataset
-from PIL import Image
 
 from utils import transform_image
 
@@ -11,7 +12,7 @@ class SRDataset(Dataset):
     def __init__(
         self,
         data_folder: str,
-        scaling_factor: int,
+        scaling_factor: Literal[2, 4, 8],
         crop_size: int,
         test_mode: bool = False,
         dev_mode: bool = False,

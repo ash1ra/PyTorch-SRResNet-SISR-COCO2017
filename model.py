@@ -41,7 +41,12 @@ class ConvBlock(nn.Module):
 
 
 class SubPixelConvBlock(nn.Module):
-    def __init__(self, n_channels: int, kernel_size: int, scaling_factor: int) -> None:
+    def __init__(
+        self,
+        n_channels: int,
+        kernel_size: int,
+        scaling_factor: Literal[2, 4, 8],
+    ) -> None:
         super().__init__()
 
         self.subpixel_conv_block = nn.Sequential(
@@ -90,7 +95,7 @@ class SRResNet(nn.Module):
         large_kernel_size: int,
         small_kernel_size: int,
         n_res_blocks: int,
-        scaling_factor: int,
+        scaling_factor: Literal[2, 4, 8],
     ) -> None:
         super().__init__()
 

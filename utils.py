@@ -12,7 +12,7 @@ from torchvision.transforms import v2 as transforms
 
 def transform_image(
     img_path: Path,
-    scaling_factor: int,
+    scaling_factor: Literal[2, 4, 8],
     crop_size: int,
     test_mode: bool = False,
 ) -> tuple[Tensor, Tensor]:
