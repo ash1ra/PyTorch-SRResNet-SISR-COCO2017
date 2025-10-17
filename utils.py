@@ -20,37 +20,33 @@ def transform_image(
     img_tensor = decode_image(img_path.__fspath__())
 
     if test_mode:
-        hr_transform = transforms.Compose(
-            [
-                transforms.CenterCrop(size=(crop_size, crop_size)),
-                transforms.ToDtype(torch.float32, scale=True),
-                transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
-            ]
-        )
+        crop_transform = transforms.CenterCrop(size=(crop_size, crop_size))
     else:
-        hr_transform = transforms.Compose(
-            [
-                transforms.RandomCrop(size=(crop_size, crop_size)),
-                transforms.ToDtype(torch.float32, scale=True),
-                transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
-            ]
-        )
+        crop_transform = transforms.RandomCrop(size=(crop_size, crop_size))
+
+    hr_img_tensor = crop_transform(img_tensor)
 
     lr_transform = transforms.Compose(
         [
-            transforms.CenterCrop(size=(crop_size, crop_size)),
             transforms.Resize(
                 size=(crop_size // scaling_factor, crop_size // scaling_factor),
                 interpolation=InterpolationMode.BICUBIC,
                 antialias=True,
             ),
             transforms.ToDtype(torch.float32, scale=True),
+        ]
+    )
+
+    lr_img_tensor = lr_transform(hr_img_tensor)
+
+    hr_transform = transforms.Compose(
+        [
+            transforms.ToDtype(torch.float32, scale=True),
             transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
         ]
     )
 
-    hr_img_tensor = hr_transform(img_tensor)
-    lr_img_tensor = lr_transform(img_tensor)
+    hr_img_tensor = hr_transform(hr_img_tensor)
 
     return hr_img_tensor, lr_img_tensor
 
