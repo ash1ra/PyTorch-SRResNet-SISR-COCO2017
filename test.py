@@ -6,11 +6,10 @@ from torch import nn, optim
 from torch.amp import GradScaler
 from torch.utils.data import DataLoader
 from torchmetrics.image import PeakSignalNoiseRatio, StructuralSimilarityIndexMeasure
-from tqdm import tqdm
 
 from data_processing import SRDataset
 from model import SRResNet
-from utils import load_checkpoint
+from utils import load_checkpoint, rgb_to_ycbcr
 
 SCALING_FACTOR: Literal[2, 4, 8] = 4
 
@@ -48,20 +47,18 @@ def test_step(
     model.eval()
 
     with torch.inference_mode():
-        for hr_image_tensor, lr_image_tensor in tqdm(
-            data_loader, desc="Testing", leave=False
-        ):
+        for hr_image_tensor, lr_image_tensor in data_loader:
             hr_image_tensor = hr_image_tensor.to(device, non_blocking=True)
             lr_image_tensor = lr_image_tensor.to(device, non_blocking=True)
 
-            preds = model(lr_image_tensor)
-            loss = loss_fn(preds, hr_image_tensor)
+            sr_image_tensor = model(lr_image_tensor)
+            loss = loss_fn(sr_image_tensor, hr_image_tensor)
 
-            preds_denormilized = (preds + 1) / 2
-            hr_image_tensor_denormilized = (hr_image_tensor + 1) / 2
+            y_hr_tensor = rgb_to_ycbcr(hr_image_tensor)
+            y_sr_tensor = rgb_to_ycbcr(sr_image_tensor)
 
-            psnr = psnr_metric(preds_denormilized, hr_image_tensor_denormilized)
-            ssim = ssim_metric(preds_denormilized, hr_image_tensor_denormilized)
+            psnr = psnr_metric(y_sr_tensor, y_hr_tensor)
+            ssim = ssim_metric(y_sr_tensor, y_hr_tensor)
 
             total_loss += loss.item()
             total_psnr += psnr.item()
@@ -82,8 +79,8 @@ def main() -> None:
     ).to(device)
 
     loss_fn = nn.MSELoss()
-    psnr_metric = PeakSignalNoiseRatio(data_range=1.0).to(device)
-    ssim_metric = StructuralSimilarityIndexMeasure(data_range=1.0).to(device)
+    psnr_metric = PeakSignalNoiseRatio(data_range=(0, 1)).to(device)
+    ssim_metric = StructuralSimilarityIndexMeasure(data_range=(0, 1)).to(device)
 
     optimizer = optim.Adam(model.parameters())
     scaler = GradScaler(device) if device == "cuda" else None

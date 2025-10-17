@@ -164,3 +164,35 @@ def compare_images(
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     comparison_img.save(output_path, format="PNG")
+
+
+def rgb_to_ycbcr(image_tensor: torch.Tensor) -> torch.Tensor:
+    if image_tensor.dim() == 4:
+        image_tensor.squeeze_(0)
+
+    image_tensor = (image_tensor + 1) / 2
+
+    weights = torch.tensor(
+        [0.299, 0.587, 0.114],
+        dtype=image_tensor.dtype,
+        device=image_tensor.device,
+    )
+
+    Y_channel = torch.sum(
+        image_tensor * weights.view(1, 3, 1, 1),
+        dim=1,
+        keepdim=True,
+    )
+
+    return Y_channel
+
+
+def format_time(total_seconds: float) -> str:
+    if total_seconds < 0:
+        total_seconds = 0
+
+    hours = int(total_seconds // 3600)
+    minutes = int((total_seconds % 3600) // 60)
+    seconds = int(total_seconds % 60)
+
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d}"

@@ -1,15 +1,16 @@
 from pathlib import Path
+from time import time
 from typing import Literal
 
 import torch
 from torch import nn, optim
 from torch.amp import GradScaler, autocast
 from torch.utils.data import DataLoader
-from tqdm import tqdm
+from torchmetrics.image import PeakSignalNoiseRatio, StructuralSimilarityIndexMeasure
 
 from data_processing import SRDataset
 from model import SRResNet
-from utils import load_checkpoint, save_checkpoint
+from utils import format_time, load_checkpoint, rgb_to_ycbcr, save_checkpoint
 
 SCALING_FACTOR: Literal[2, 4, 8] = 4
 CROP_SIZE = 96
@@ -21,9 +22,9 @@ SMALL_KERNEL_SIZE = 3
 
 BATCH_SIZE = 32
 LEARNING_RATE = 1e-4
-EPOCHS = 10
-LOAD_MODEL = True
-DEV_MODE = True
+EPOCHS = 100
+LOAD_MODEL = False
+DEV_MODE = False
 
 NUM_WORKERS = 8
 
@@ -45,19 +46,17 @@ def train_step(
 
     model.train()
 
-    for hr_image_tensor, lr_image_tensor in tqdm(
-        data_loader, desc="Training", leave=False
-    ):
+    for hr_image_tensor, lr_image_tensor in data_loader:
         hr_image_tensor = hr_image_tensor.to(device, non_blocking=True)
         lr_image_tensor = lr_image_tensor.to(device, non_blocking=True)
 
         if scaler:
             with autocast(device):
-                preds = model(lr_image_tensor)
-                loss = loss_fn(preds, hr_image_tensor)
+                sr_image_tensor = model(lr_image_tensor)
+                loss = loss_fn(sr_image_tensor, hr_image_tensor)
         else:
-            preds = model(lr_image_tensor)
-            loss = loss_fn(preds, hr_image_tensor)
+            sr_image_tensor = model(lr_image_tensor)
+            loss = loss_fn(sr_image_tensor, hr_image_tensor)
 
         total_loss += loss.item()
 
@@ -76,34 +75,90 @@ def train_step(
     return total_loss
 
 
-def train(
+def validation_step(
     data_loader: DataLoader,
+    model: nn.Module,
+    loss_fn: nn.Module,
+    psnr_metric: PeakSignalNoiseRatio,
+    ssim_metric: StructuralSimilarityIndexMeasure,
+    device: Literal["cpu", "cuda"] = "cpu",
+) -> tuple[float, float, float]:
+    total_loss = 0
+    total_psnr = 0
+    total_ssim = 0
+
+    model.eval()
+
+    with torch.inference_mode():
+        for hr_image_tensor, lr_image_tensor in data_loader:
+            hr_image_tensor = hr_image_tensor.to(device, non_blocking=True)
+            lr_image_tensor = lr_image_tensor.to(device, non_blocking=True)
+
+            sr_image_tensor = model(lr_image_tensor)
+            loss = loss_fn(sr_image_tensor, hr_image_tensor)
+
+            y_hr_tensor = rgb_to_ycbcr(hr_image_tensor)
+            y_sr_tensor = rgb_to_ycbcr(sr_image_tensor)
+
+            psnr = psnr_metric(y_sr_tensor, y_hr_tensor)
+            ssim = ssim_metric(y_sr_tensor, y_hr_tensor)
+
+            total_loss += loss.item()
+            total_psnr += psnr.item()
+            total_ssim += ssim.item()
+
+        total_loss /= len(data_loader)
+        total_psnr /= len(data_loader)
+        total_ssim /= len(data_loader)
+
+    return total_loss, total_psnr, total_ssim
+
+
+def train(
+    train_data_loader: DataLoader,
+    val_data_loader: DataLoader,
     model: nn.Module,
     loss_fn: nn.Module,
     optimizer: optim.Optimizer,
     start_epoch: int,
     epochs: int,
+    psnr_metric: PeakSignalNoiseRatio,
+    ssim_metric: StructuralSimilarityIndexMeasure,
     scaler: GradScaler | None = None,
     device: Literal["cpu", "cuda"] = "cpu",
 ) -> None:
+    best_psnr = 0.0
+
     try:
-        progress_bar = tqdm(range(start_epoch, epochs + 1), desc="Epochs", leave=True)
+        for epoch in range(start_epoch, epochs + 1):
+            start_time = time()
 
-        for epoch in progress_bar:
             train_loss = train_step(
-                data_loader, model, loss_fn, optimizer, scaler, device
+                train_data_loader, model, loss_fn, optimizer, scaler, device
             )
-            progress_bar.set_postfix({"loss": f"{train_loss:.4f}"})
-            print()
 
-            save_checkpoint(
-                MODEL_CHECKPOINT_PATH,
-                STATE_CHECKPOINT_PATH,
-                epoch,
-                model,
-                optimizer,
-                scaler,
+            val_loss, val_psnr, val_ssim = validation_step(
+                val_data_loader, model, loss_fn, psnr_metric, ssim_metric, device
             )
+
+            end_time = time() - start_time
+            epoch_time = format_time(end_time)
+            remaining_time = format_time(end_time * (epochs - epoch))
+
+            print(
+                f"Epoch: {epoch}/{epochs} ({epoch_time}/{remaining_time}) | T loss: {train_loss:.4f} | V loss: {val_loss:.4f} | PSNR: {val_psnr:.2f} | SSIM: {val_ssim:.2f}"
+            )
+
+            if val_psnr > best_psnr:
+                best_psnr = val_psnr
+                save_checkpoint(
+                    MODEL_CHECKPOINT_PATH,
+                    STATE_CHECKPOINT_PATH,
+                    epoch,
+                    model,
+                    optimizer,
+                    scaler,
+                )
     except KeyboardInterrupt:
         save_checkpoint(
             MODEL_CHECKPOINT_PATH,
@@ -119,17 +174,32 @@ def train(
 def main() -> None:
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    dataset = SRDataset(
+    train_dataset = SRDataset(
         data_folder="data/COCO2017_train",
         scaling_factor=SCALING_FACTOR,
         crop_size=CROP_SIZE,
         dev_mode=DEV_MODE,
     )
 
-    data_loader = DataLoader(
-        dataset=dataset,
+    val_dataset = SRDataset(
+        data_folder="data/COCO2017_test",
+        scaling_factor=SCALING_FACTOR,
+        crop_size=CROP_SIZE,
+        dev_mode=DEV_MODE,
+    )
+
+    train_data_loader = DataLoader(
+        dataset=train_dataset,
         batch_size=BATCH_SIZE,
         shuffle=True,
+        pin_memory=True if device == "cuda" else False,
+        num_workers=NUM_WORKERS,
+    )
+
+    val_data_loader = DataLoader(
+        dataset=val_dataset,
+        batch_size=BATCH_SIZE,
+        shuffle=False,
         pin_memory=True if device == "cuda" else False,
         num_workers=NUM_WORKERS,
     )
@@ -143,6 +213,9 @@ def main() -> None:
     ).to(device)
 
     loss_fn = nn.MSELoss()
+    psnr_metric = PeakSignalNoiseRatio(data_range=(0, 1)).to(device)
+    ssim_metric = StructuralSimilarityIndexMeasure(data_range=(0, 1)).to(device)
+
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
     scaler = GradScaler(device) if device == "cuda" else None
 
@@ -159,12 +232,15 @@ def main() -> None:
         start_epoch = 1
 
     train(
-        data_loader=data_loader,
+        train_data_loader=train_data_loader,
+        val_data_loader=val_data_loader,
         model=model,
         loss_fn=loss_fn,
         optimizer=optimizer,
         start_epoch=start_epoch,
         epochs=EPOCHS,
+        psnr_metric=psnr_metric,
+        ssim_metric=ssim_metric,
         scaler=scaler,
         device=device,
     )
