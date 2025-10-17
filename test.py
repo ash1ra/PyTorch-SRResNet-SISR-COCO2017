@@ -13,7 +13,6 @@ from model import SRResNet
 from utils import load_checkpoint
 
 SCALING_FACTOR: Literal[2, 4, 8] = 4
-CROP_SIZE = 96
 
 N_CHANNELS = 64
 N_RES_BLOCKS = 16
@@ -50,7 +49,7 @@ def test_step(
 
     with torch.inference_mode():
         for hr_image_tensor, lr_image_tensor in tqdm(
-            data_loader, desc="Training", leave=False
+            data_loader, desc="Testing", leave=False
         ):
             hr_image_tensor = hr_image_tensor.to(device, non_blocking=True)
             lr_image_tensor = lr_image_tensor.to(device, non_blocking=True)
@@ -102,7 +101,6 @@ def main() -> None:
         dataset = SRDataset(
             data_folder=DATASETS_DIR / dataset_name,
             scaling_factor=SCALING_FACTOR,
-            crop_size=CROP_SIZE,
             test_mode=True,
         )
 

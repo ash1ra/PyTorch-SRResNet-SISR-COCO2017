@@ -14,39 +14,52 @@ from torchvision.transforms import v2 as transforms
 def transform_image(
     img_path: Path,
     scaling_factor: Literal[2, 4, 8],
-    crop_size: int,
+    crop_size: int | None,
     test_mode: bool = False,
 ) -> tuple[Tensor, Tensor]:
     img_tensor = decode_image(img_path.__fspath__())
 
     if test_mode:
-        crop_transform = transforms.CenterCrop(size=(crop_size, crop_size))
-    else:
+        _, height, width = img_tensor.shape
+
+        height_remainder = height % scaling_factor
+        width_remainder = width % scaling_factor
+
+        top = height_remainder // 2
+        left = width_remainder // 2
+
+        bottom = top + (height - height_remainder)
+        right = left + (width - width_remainder)
+
+        hr_img_tensor = img_tensor[:, top:bottom, left:right]
+    elif crop_size:
         crop_transform = transforms.RandomCrop(size=(crop_size, crop_size))
+        hr_img_tensor = crop_transform(img_tensor)
 
-    hr_img_tensor = crop_transform(img_tensor)
-
-    lr_transform = transforms.Compose(
-        [
-            transforms.Resize(
-                size=(crop_size // scaling_factor, crop_size // scaling_factor),
-                interpolation=InterpolationMode.BICUBIC,
-                antialias=True,
-            ),
-            transforms.ToDtype(torch.float32, scale=True),
-        ]
-    )
-
-    lr_img_tensor = lr_transform(hr_img_tensor)
-
-    hr_transform = transforms.Compose(
+    normalize_transform = transforms.Compose(
         [
             transforms.ToDtype(torch.float32, scale=True),
             transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
         ]
     )
 
-    hr_img_tensor = hr_transform(hr_img_tensor)
+    lr_transform = transforms.Compose(
+        [
+            transforms.Resize(
+                size=(
+                    hr_img_tensor.shape[1] // scaling_factor,
+                    hr_img_tensor.shape[2] // scaling_factor,
+                ),
+                interpolation=InterpolationMode.BICUBIC,
+                antialias=True,
+            ),
+        ]
+    )
+
+    lr_img_tensor = lr_transform(hr_img_tensor)
+
+    hr_img_tensor = normalize_transform(hr_img_tensor)
+    lr_img_tensor = normalize_transform(lr_img_tensor)
 
     return hr_img_tensor, lr_img_tensor
 
