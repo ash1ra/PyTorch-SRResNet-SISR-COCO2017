@@ -5,6 +5,7 @@ from typing import Literal
 import torch
 from torch import nn, optim
 from torch.amp import GradScaler, autocast
+from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.data import DataLoader
 from torchmetrics.image import PeakSignalNoiseRatio, StructuralSimilarityIndexMeasure
 
@@ -22,9 +23,10 @@ SMALL_KERNEL_SIZE = 3
 
 BATCH_SIZE = 32
 LEARNING_RATE = 1e-4
-EPOCHS = 100
+MAX_LEARNING_RATE = 1e-3
+EPOCHS = 10
 LOAD_MODEL = False
-DEV_MODE = False
+DEV_MODE = True
 
 NUM_WORKERS = 8
 
@@ -40,6 +42,7 @@ def train_step(
     loss_fn: nn.Module,
     optimizer: optim.Optimizer,
     scaler: GradScaler | None,
+    scheduler: OneCycleLR | None,
     device: Literal["cpu", "cuda"] = "cpu",
 ) -> float:
     total_loss = 0
@@ -69,6 +72,9 @@ def train_step(
         else:
             loss.backward()
             optimizer.step()
+
+        if scheduler:
+            scheduler.step()
 
     total_loss /= len(data_loader)
 
@@ -125,6 +131,7 @@ def train(
     psnr_metric: PeakSignalNoiseRatio,
     ssim_metric: StructuralSimilarityIndexMeasure,
     scaler: GradScaler | None = None,
+    scheduler: OneCycleLR | None = None,
     device: Literal["cpu", "cuda"] = "cpu",
 ) -> None:
     best_psnr = 0.0
@@ -134,7 +141,7 @@ def train(
             start_time = time()
 
             train_loss = train_step(
-                train_data_loader, model, loss_fn, optimizer, scaler, device
+                train_data_loader, model, loss_fn, optimizer, scaler, scheduler, device
             )
 
             val_loss, val_psnr, val_ssim = validation_step(
@@ -145,8 +152,10 @@ def train(
             epoch_time = format_time(end_time)
             remaining_time = format_time(end_time * (epochs - epoch))
 
+            current_lr = optimizer.param_groups[0]["lr"]
+
             print(
-                f"Epoch: {epoch}/{epochs} ({epoch_time}/{remaining_time}) | T loss: {train_loss:.4f} | V loss: {val_loss:.4f} | PSNR: {val_psnr:.2f} | SSIM: {val_ssim:.2f}"
+                f"Epoch: {epoch}/{epochs} ({epoch_time}/{remaining_time}) | LR: {current_lr:.2e} | T loss: {train_loss:.4f} | V loss: {val_loss:.4f} | PSNR: {val_psnr:.2f} | SSIM: {val_ssim:.2f}"
             )
 
             if val_psnr > best_psnr:
@@ -213,11 +222,18 @@ def main() -> None:
     ).to(device)
 
     loss_fn = nn.MSELoss()
-    psnr_metric = PeakSignalNoiseRatio(data_range=(0, 1)).to(device)
-    ssim_metric = StructuralSimilarityIndexMeasure(data_range=(0, 1)).to(device)
+    psnr_metric = PeakSignalNoiseRatio(data_range=1.0).to(device)
+    ssim_metric = StructuralSimilarityIndexMeasure(data_range=1.0).to(device)
 
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
     scaler = GradScaler(device) if device == "cuda" else None
+    scheduler = OneCycleLR(
+        optimizer=optimizer,
+        max_lr=MAX_LEARNING_RATE,
+        total_steps=EPOCHS * len(train_data_loader),
+        div_factor=MAX_LEARNING_RATE / LEARNING_RATE,
+        final_div_factor=100,
+    )
 
     if LOAD_MODEL:
         start_epoch = load_checkpoint(
@@ -226,6 +242,7 @@ def main() -> None:
             model,
             optimizer,
             scaler,
+            scheduler,
             device,
         )
     else:
@@ -242,6 +259,7 @@ def main() -> None:
         psnr_metric=psnr_metric,
         ssim_metric=ssim_metric,
         scaler=scaler,
+        scheduler=scheduler,
         device=device,
     )
 

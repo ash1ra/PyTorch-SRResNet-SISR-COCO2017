@@ -6,6 +6,7 @@ from PIL import Image, ImageDraw, ImageFont
 from safetensors.torch import load_file, save_file
 from torch import Tensor, nn, optim
 from torch.amp import GradScaler
+from torch.optim.lr_scheduler import OneCycleLR
 from torchvision.io import decode_image
 from torchvision.transforms import InterpolationMode
 from torchvision.transforms import v2 as transforms
@@ -71,6 +72,7 @@ def save_checkpoint(
     model: nn.Module,
     optimizer: optim.Optimizer,
     scaler: GradScaler | None = None,
+    scheduler: OneCycleLR | None = None,
 ) -> None:
     Path(model_filepath).parent.mkdir(parents=True, exist_ok=True)
     Path(state_filepath).parent.mkdir(parents=True, exist_ok=True)
@@ -85,6 +87,9 @@ def save_checkpoint(
     if scaler:
         state_dict["scaler_state_dict"] = scaler.state_dict()
 
+    if scheduler:
+        state_dict["scheduler_state_dict"] = scheduler.state_dict()
+
     torch.save(state_dict, state_filepath)
 
 
@@ -94,6 +99,7 @@ def load_checkpoint(
     model: nn.Module,
     optimizer: optim.Optimizer,
     scaler: GradScaler | None = None,
+    scheduler: OneCycleLR | None = None,
     device: Literal["cpu", "cuda"] = "cpu",
 ) -> int:
     if Path(model_filepath).exists() and Path(state_filepath).exists():
@@ -102,8 +108,12 @@ def load_checkpoint(
         checkpoint_dict = torch.load(state_filepath, map_location=device)
 
         optimizer.load_state_dict(checkpoint_dict["optimizer_state_dict"])
+
         if scaler and "scaler_state_dict" in checkpoint_dict:
             scaler.load_state_dict(checkpoint_dict["scaler_state_dict"])
+
+        if scheduler and "scheduler_state_dict" in checkpoint_dict:
+            scheduler.load_state_dict(checkpoint_dict["scheduler_state_dict"])
 
         return checkpoint_dict["epoch"]
     return 1
