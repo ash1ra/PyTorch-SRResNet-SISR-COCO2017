@@ -12,6 +12,19 @@ from torchvision.transforms import InterpolationMode
 from torchvision.transforms import v2 as transforms
 
 
+tta_transforms = [
+    transforms.Compose([transforms.Lambda(lambda x: x)]),
+    transforms.Compose([transforms.RandomHorizontalFlip(p=1.0)]),
+    transforms.Compose([transforms.RandomVerticalFlip(p=1.0)]),
+    transforms.Compose(
+        [
+            transforms.RandomHorizontalFlip(p=1.0),
+            transforms.RandomVerticalFlip(p=1.0),
+        ]
+    ),
+]
+
+
 def transform_image(
     img_path: Path,
     scaling_factor: Literal[2, 4, 8],
@@ -75,6 +88,16 @@ def transform_image(
     lr_img_tensor = normalize_transform(lr_img_tensor)
 
     return hr_img_tensor, lr_img_tensor
+
+
+def inverse_tta_transform(img_tensor: Tensor, transform: transforms.Compose) -> Tensor:
+    for t in transform.transforms:
+        if isinstance(t, transforms.RandomHorizontalFlip) or isinstance(
+            t, transforms.RandomVerticalFlip
+        ):
+            img_tensor = t(img_tensor)
+
+    return img_tensor
 
 
 def save_checkpoint(

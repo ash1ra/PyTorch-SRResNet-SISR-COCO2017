@@ -3,13 +3,12 @@ from typing import Literal
 
 import torch
 from torch import nn, optim
-from torch.amp import GradScaler
 from torch.utils.data import DataLoader
 from torchmetrics.image import PeakSignalNoiseRatio, StructuralSimilarityIndexMeasure
 
 from data_processing import SRDataset
 from model import SRResNet
-from utils import load_checkpoint, rgb_to_ycbcr
+from utils import inverse_tta_transform, load_checkpoint, rgb_to_ycbcr, tta_transforms
 
 SCALING_FACTOR: Literal[2, 4, 8] = 4
 
@@ -37,6 +36,7 @@ def test_step(
     loss_fn: nn.Module,
     psnr_metric: PeakSignalNoiseRatio,
     ssim_metric: StructuralSimilarityIndexMeasure,
+    use_tta: bool = True,
     device: Literal["cpu", "cuda"] = "cpu",
 ) -> tuple[float, float, float]:
     total_loss = 0.0
@@ -51,7 +51,20 @@ def test_step(
             hr_image_tensor = hr_image_tensor.to(device, non_blocking=True)
             lr_image_tensor = lr_image_tensor.to(device, non_blocking=True)
 
-            sr_image_tensor = model(lr_image_tensor)
+            if use_tta:
+                sr_images = []
+
+                for tta_transform in tta_transforms:
+                    sr_image_tensor = model(tta_transform(lr_image_tensor))
+                    sr_image_tensor = inverse_tta_transform(
+                        sr_image_tensor, tta_transform
+                    )
+                    sr_images.append(sr_image_tensor)
+
+                sr_image_tensor = torch.mean(torch.stack(sr_images), dim=0)
+            else:
+                sr_image_tensor = model(lr_image_tensor)
+
             loss = loss_fn(sr_image_tensor, hr_image_tensor)
 
             y_hr_tensor = rgb_to_ycbcr(hr_image_tensor)
@@ -79,19 +92,17 @@ def main() -> None:
     ).to(device)
 
     loss_fn = nn.MSELoss()
-    psnr_metric = PeakSignalNoiseRatio(data_range=(0, 1)).to(device)
-    ssim_metric = StructuralSimilarityIndexMeasure(data_range=(0, 1)).to(device)
+    psnr_metric = PeakSignalNoiseRatio(data_range=1.0).to(device)
+    ssim_metric = StructuralSimilarityIndexMeasure(data_range=1.0).to(device)
 
     optimizer = optim.Adam(model.parameters())
-    scaler = GradScaler(device) if device == "cuda" else None
 
     _ = load_checkpoint(
-        MODEL_CHECKPOINT_PATH,
-        STATE_CHECKPOINT_PATH,
-        model,
-        optimizer,
-        scaler,
-        device,
+        model_filepath=MODEL_CHECKPOINT_PATH,
+        state_filepath=STATE_CHECKPOINT_PATH,
+        model=model,
+        optimizer=optimizer,
+        device=device,
     )
 
     for dataset_name in DATASETS:
@@ -110,7 +121,7 @@ def main() -> None:
         )
 
         avg_loss, avg_psnr, avg_ssim = test_step(
-            data_loader, model, loss_fn, psnr_metric, ssim_metric, device
+            data_loader, model, loss_fn, psnr_metric, ssim_metric, True, device
         )
 
         print(

@@ -6,10 +6,10 @@ import torchvision.transforms.v2 as transforms
 from torchvision.io import decode_image
 
 from model import SRResNet
-from utils import compare_images, load_checkpoint
+from utils import compare_images, inverse_tta_transform, load_checkpoint, tta_transforms
 
-INPUT_PATH = Path.home() / "Downloads/1.jpg"
-OUTPUT_PATH = Path("result.png")
+INPUT_PATH = Path("images/1.jpg")
+OUTPUT_PATH = Path("images/result.png")
 SCALING_FACTOR: Literal[2, 4, 8] = 4
 N_CHANNELS = 64
 N_RES_BLOCKS = 16
@@ -26,6 +26,7 @@ def upscale_image(
     input_path: Path,
     output_path: Path,
     scaling_factor: Literal[2, 4, 8],
+    use_tta: bool = True,
     device: Literal["cpu", "cuda"] = "cpu",
 ) -> None:
     if not input_path.exists():
@@ -45,10 +46,10 @@ def upscale_image(
     optimizer = torch.optim.Adam(model.parameters())
 
     load_checkpoint(
-        MODEL_CHECKPOINT_PATH,
-        STATE_CHECKPOINT_PATH,
-        model,
-        optimizer,
+        model_filepath=MODEL_CHECKPOINT_PATH,
+        state_filepath=STATE_CHECKPOINT_PATH,
+        model=model,
+        optimizer=optimizer,
         device=device,
     )
 
@@ -70,19 +71,29 @@ def upscale_image(
     img_tensor = transform(img_tensor).unsqueeze(0).to(device)
 
     with torch.inference_mode():
-        upscaled_tensor = model(img_tensor)
+        if use_tta:
+            sr_images = []
 
-    compare_images(img_tensor, upscaled_tensor, "comparison_image.png")
+            for tta_transform in tta_transforms:
+                sr_image_tensor = model(tta_transform(img_tensor))
+                sr_image_tensor = inverse_tta_transform(sr_image_tensor, tta_transform)
+                sr_images.append(sr_image_tensor)
 
-    upscaled_tensor = (upscaled_tensor + 1) / 2
-    upscaled_tensor = upscaled_tensor.clamp(0, 1) * 255
-    upscaled_tensor = upscaled_tensor.squeeze(0).byte()
+            sr_image_tensor = torch.mean(torch.stack(sr_images), dim=0)
+        else:
+            sr_image_tensor = model(img_tensor)
+
+    compare_images(img_tensor, sr_image_tensor, "images/comparison_image.png")
+
+    sr_image_tensor = (sr_image_tensor + 1) / 2
+    sr_image_tensor = sr_image_tensor.clamp(0, 1) * 255
+    sr_image_tensor = sr_image_tensor.squeeze(0).byte()
 
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    pil_image = transforms.ToPILImage()(upscaled_tensor)
-    pil_image.save(output_path, format="PNG")
+    sr_image = transforms.ToPILImage()(sr_image_tensor)
+    sr_image.save(output_path, format="PNG")
 
     print(f"Upscaled image saved to {output_path}")
 
@@ -94,6 +105,7 @@ def main() -> None:
         input_path=INPUT_PATH,
         output_path=OUTPUT_PATH,
         scaling_factor=SCALING_FACTOR,
+        use_tta=True,
         device=device,
     )
 
