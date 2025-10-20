@@ -12,6 +12,8 @@ from torchmetrics.image import PeakSignalNoiseRatio, StructuralSimilarityIndexMe
 from data_processing import SRDataset
 from model import SRResNet
 from utils import format_time, load_checkpoint, rgb_to_ycbcr, save_checkpoint
+from config import create_logger
+
 
 SCALING_FACTOR: Literal[2, 4, 8] = 4
 CROP_SIZE = 96
@@ -35,6 +37,8 @@ MODEL_NAME = "srresnet"
 MODEL_CHECKPOINT_PATH = CHECKPOINTS_DIR / f"{MODEL_NAME}_model.safetensors"
 STATE_CHECKPOINT_PATH = CHECKPOINTS_DIR / f"{MODEL_NAME}_state.pth"
 
+logger = create_logger(log_level="INFO")
+
 
 def train_step(
     data_loader: DataLoader,
@@ -49,7 +53,7 @@ def train_step(
 
     model.train()
 
-    for hr_image_tensor, lr_image_tensor in data_loader:
+    for i, (hr_image_tensor, lr_image_tensor) in enumerate(data_loader):
         hr_image_tensor = hr_image_tensor.to(device, non_blocking=True)
         lr_image_tensor = lr_image_tensor.to(device, non_blocking=True)
 
@@ -75,6 +79,9 @@ def train_step(
 
         if scheduler:
             scheduler.step()
+
+        if i % 500 == 0:
+            logger.debug(f"Processing batch {i}/{len(data_loader)}...")
 
     total_loss /= len(data_loader)
 
@@ -154,7 +161,7 @@ def train(
 
             current_lr = optimizer.param_groups[0]["lr"]
 
-            print(
+            logger.info(
                 f"Epoch: {epoch}/{epochs} ({epoch_time}/{remaining_time}) | LR: {current_lr:.2e} | T loss: {train_loss:.4f} | V loss: {val_loss:.4f} | PSNR: {val_psnr:.2f} | SSIM: {val_ssim:.2f}"
             )
 

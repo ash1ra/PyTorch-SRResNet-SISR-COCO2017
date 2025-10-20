@@ -11,6 +11,7 @@ from torchvision.io import decode_image
 from torchvision.transforms import InterpolationMode
 from torchvision.transforms import v2 as transforms
 
+from config import create_logger
 
 tta_transforms = [
     transforms.Compose([transforms.Lambda(lambda x: x)]),
@@ -23,6 +24,8 @@ tta_transforms = [
         ]
     ),
 ]
+
+logger = create_logger(log_level="INFO")
 
 
 def transform_image(
@@ -127,6 +130,8 @@ def save_checkpoint(
 
     torch.save(state_dict, state_filepath)
 
+    logger.debug(f"The model's weights were saved after the {epoch} epoch")
+
 
 def load_checkpoint(
     model_filepath: str,
@@ -209,6 +214,8 @@ def compare_images(
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     comparison_img.save(output_path, format="PNG")
+
+    logger.debug(f"Comparison image was saved to {output_path}")
 
 
 def rgb_to_ycbcr(image_tensor: torch.Tensor) -> torch.Tensor:

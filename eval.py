@@ -5,6 +5,7 @@ import torch
 import torchvision.transforms.v2 as transforms
 from torchvision.io import decode_image
 
+from config import create_logger
 from model import SRResNet
 from utils import compare_images, inverse_tta_transform, load_checkpoint, tta_transforms
 
@@ -20,6 +21,8 @@ CHECKPOINTS_DIR = Path("checkpoints")
 MODEL_NAME = "srresnet"
 MODEL_CHECKPOINT_PATH = CHECKPOINTS_DIR / f"{MODEL_NAME}_model.safetensors"
 STATE_CHECKPOINT_PATH = CHECKPOINTS_DIR / f"{MODEL_NAME}_state.pth"
+
+logger = create_logger(log_level="INFO")
 
 
 def upscale_image(
@@ -95,7 +98,7 @@ def upscale_image(
     sr_image = transforms.ToPILImage()(sr_image_tensor)
     sr_image.save(output_path, format="PNG")
 
-    print(f"Upscaled image saved to {output_path}")
+    logger.info(f"Upscaled image was saved to {output_path}")
 
 
 def main() -> None:

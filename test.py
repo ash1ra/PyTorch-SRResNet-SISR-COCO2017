@@ -6,6 +6,7 @@ from torch import nn, optim
 from torch.utils.data import DataLoader
 from torchmetrics.image import PeakSignalNoiseRatio, StructuralSimilarityIndexMeasure
 
+from config import create_logger
 from data_processing import SRDataset
 from model import SRResNet
 from utils import inverse_tta_transform, load_checkpoint, rgb_to_ycbcr, tta_transforms
@@ -28,6 +29,8 @@ STATE_CHECKPOINT_PATH = CHECKPOINTS_DIR / f"{MODEL_NAME}_state.pth"
 
 DATASETS_DIR = Path("data")
 DATASETS = ["Set5", "Set14", "BSDS100", "Urban100"]
+
+logger = create_logger(log_level="INFO")
 
 
 def test_step(
@@ -124,7 +127,7 @@ def main() -> None:
             data_loader, model, loss_fn, psnr_metric, ssim_metric, True, device
         )
 
-        print(
+        logger.info(
             f"{dataset_name} Dataset | Avg loss: {avg_loss:.4f} | PSNR: {avg_psnr:.4f} | SSIM: {avg_ssim:.4f}"
         )
 
