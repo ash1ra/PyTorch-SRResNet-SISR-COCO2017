@@ -19,6 +19,18 @@ def transform_image(
     test_mode: bool = False,
 ) -> tuple[Tensor, Tensor]:
     img_tensor = decode_image(img_path.__fspath__())
+    hr_img_tensor = img_tensor
+
+    augmentation_transform = transforms.Compose(
+        [
+            transforms.RandomHorizontalFlip(p=0.5),
+            transforms.RandomVerticalFlip(p=0.5),
+            transforms.RandomRotation(degrees=(0, 90), expand=True),
+        ]
+    )
+
+    if not test_mode:
+        hr_img_tensor = augmentation_transform(hr_img_tensor)
 
     if test_mode:
         _, height, width = img_tensor.shape
@@ -37,13 +49,6 @@ def transform_image(
         crop_transform = transforms.RandomCrop(size=(crop_size, crop_size))
         hr_img_tensor = crop_transform(img_tensor)
 
-    normalize_transform = transforms.Compose(
-        [
-            transforms.ToDtype(torch.float32, scale=True),
-            transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
-        ]
-    )
-
     lr_transform = transforms.Compose(
         [
             transforms.Resize(
@@ -54,6 +59,13 @@ def transform_image(
                 interpolation=InterpolationMode.BICUBIC,
                 antialias=True,
             ),
+        ]
+    )
+
+    normalize_transform = transforms.Compose(
+        [
+            transforms.ToDtype(torch.float32, scale=True),
+            transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
         ]
     )
 
