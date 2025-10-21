@@ -284,7 +284,7 @@ def plot_training_metrics(metrics: Metrics) -> None:
     fig.suptitle("SRResNet Metrics", fontsize=16)
 
     axs[0, 0].plot(batches, metrics.learning_rates, color="b")
-    axs[0, 0].set_xlabel("Epoch")
+    axs[0, 0].set_xlabel("Batches")
     axs[0, 0].set_ylabel("Learning Rate")
     axs[0, 0].grid(True)
 

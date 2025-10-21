@@ -22,9 +22,9 @@ from utils import (
 )
 
 SCALING_FACTOR: Literal[2, 4, 8] = 4
-CROP_SIZE = 96
+CROP_SIZE = 128
 
-N_CHANNELS = 64
+N_CHANNELS = 96
 N_RES_BLOCKS = 16
 LARGE_KERNEL_SIZE = 9
 SMALL_KERNEL_SIZE = 3
@@ -32,18 +32,21 @@ SMALL_KERNEL_SIZE = 3
 BATCH_SIZE = 32
 LEARNING_RATE = 1e-5
 MAX_LEARNING_RATE = 1e-3
-EPOCHS = 10
+EPOCHS = 100
 LOAD_MODEL = False
-DEV_MODE = True
+DEV_MODE = False
 
 NUM_WORKERS = 8
+
+TRAIN_DATASET_PATH = Path("data/COCO2017_train")
+VAL_DATASET_PATH = Path("data/COCO2017_test")
 
 CHECKPOINTS_DIR = Path("checkpoints")
 MODEL_NAME = "srresnet"
 MODEL_CHECKPOINT_PATH = CHECKPOINTS_DIR / f"{MODEL_NAME}_model.safetensors"
 STATE_CHECKPOINT_PATH = CHECKPOINTS_DIR / f"{MODEL_NAME}_state.pth"
 
-logger = create_logger(log_level="DEBUG")
+logger = create_logger(log_level="INFO")
 
 
 def train_step(
@@ -210,14 +213,14 @@ def main() -> None:
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     train_dataset = SRDataset(
-        data_folder="data/COCO2017_train",
+        data_folder=TRAIN_DATASET_PATH,
         scaling_factor=SCALING_FACTOR,
         crop_size=CROP_SIZE,
         dev_mode=DEV_MODE,
     )
 
     val_dataset = SRDataset(
-        data_folder="data/COCO2017_test",
+        data_folder=VAL_DATASET_PATH,
         scaling_factor=SCALING_FACTOR,
         crop_size=CROP_SIZE,
         dev_mode=DEV_MODE,
