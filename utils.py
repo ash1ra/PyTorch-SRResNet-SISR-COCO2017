@@ -1,6 +1,8 @@
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
+import matplotlib.pyplot as plt
 import torch
 from PIL import Image, ImageDraw, ImageFont
 from safetensors.torch import load_file, save_file
@@ -12,6 +14,17 @@ from torchvision.transforms import InterpolationMode
 from torchvision.transforms import v2 as transforms
 
 from config import create_logger
+
+
+@dataclass
+class Metrics:
+    epochs: int = field(default=0)
+    learning_rates: list[float] = field(default_factory=list)
+    train_losses: list[float] = field(default_factory=list)
+    val_losses: list[float] = field(default_factory=list)
+    psnrs: list[float] = field(default_factory=list)
+    ssims: list[float] = field(default_factory=list)
+
 
 tta_transforms = [
     transforms.Compose([transforms.Lambda(lambda x: x)]),
@@ -41,7 +54,7 @@ def transform_image(
         [
             transforms.RandomHorizontalFlip(p=0.5),
             transforms.RandomVerticalFlip(p=0.5),
-            transforms.RandomRotation(degrees=(0, 90), expand=True),
+            # transforms.RandomRotation(degrees=(0, 90), expand=True),
         ]
     )
 
@@ -261,3 +274,36 @@ def format_time(total_seconds: float) -> str:
     seconds = int(total_seconds % 60)
 
     return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
+
+def plot_training_metrics(metrics: Metrics) -> None:
+    batches = list(range(0, len(metrics.learning_rates)))
+    epochs = list(range(0, metrics.epochs))
+
+    fig, axs = plt.subplots(2, 2, figsize=(12, 8))
+    fig.suptitle("SRResNet Metrics", fontsize=16)
+
+    axs[0, 0].plot(batches, metrics.learning_rates, color="b")
+    axs[0, 0].set_xlabel("Epoch")
+    axs[0, 0].set_ylabel("Learning Rate")
+    axs[0, 0].grid(True)
+
+    axs[0, 1].plot(epochs, metrics.train_losses, label="Train Loss", color="g")
+    axs[0, 1].plot(epochs, metrics.val_losses, label="Val Loss", color="r")
+    axs[0, 1].set_xlabel("Epoch")
+    axs[0, 1].set_ylabel("Loss")
+    axs[0, 1].legend()
+    axs[0, 1].grid(True)
+
+    axs[1, 0].plot(epochs, metrics.psnrs, color="r")
+    axs[1, 0].set_xlabel("Epoch")
+    axs[1, 0].set_ylabel("PSNR")
+    axs[1, 0].grid(True)
+
+    axs[1, 1].plot(epochs, metrics.ssims, color="r")
+    axs[1, 1].set_xlabel("Epoch")
+    axs[1, 1].set_ylabel("SSIM")
+    axs[1, 1].grid(True)
+
+    plt.tight_layout()
+    plt.show()

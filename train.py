@@ -9,11 +9,17 @@ from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.data import DataLoader
 from torchmetrics.image import PeakSignalNoiseRatio, StructuralSimilarityIndexMeasure
 
+from config import create_logger
 from data_processing import SRDataset
 from model import SRResNet
-from utils import format_time, load_checkpoint, rgb_to_ycbcr, save_checkpoint
-from config import create_logger
-
+from utils import (
+    Metrics,
+    format_time,
+    load_checkpoint,
+    plot_training_metrics,
+    rgb_to_ycbcr,
+    save_checkpoint,
+)
 
 SCALING_FACTOR: Literal[2, 4, 8] = 4
 CROP_SIZE = 96
@@ -24,7 +30,7 @@ LARGE_KERNEL_SIZE = 9
 SMALL_KERNEL_SIZE = 3
 
 BATCH_SIZE = 32
-LEARNING_RATE = 1e-4
+LEARNING_RATE = 1e-5
 MAX_LEARNING_RATE = 1e-3
 EPOCHS = 10
 LOAD_MODEL = False
@@ -37,7 +43,7 @@ MODEL_NAME = "srresnet"
 MODEL_CHECKPOINT_PATH = CHECKPOINTS_DIR / f"{MODEL_NAME}_model.safetensors"
 STATE_CHECKPOINT_PATH = CHECKPOINTS_DIR / f"{MODEL_NAME}_state.pth"
 
-logger = create_logger(log_level="INFO")
+logger = create_logger(log_level="DEBUG")
 
 
 def train_step(
@@ -48,8 +54,9 @@ def train_step(
     scaler: GradScaler | None,
     scheduler: OneCycleLR | None,
     device: Literal["cpu", "cuda"] = "cpu",
-) -> float:
+) -> tuple[float, list[float]]:
     total_loss = 0
+    learning_rates = []
 
     model.train()
 
@@ -79,13 +86,14 @@ def train_step(
 
         if scheduler:
             scheduler.step()
+            learning_rates.append(optimizer.param_groups[0]["lr"])
 
         if i % 500 == 0:
             logger.debug(f"Processing batch {i}/{len(data_loader)}...")
 
     total_loss /= len(data_loader)
 
-    return total_loss
+    return total_loss, learning_rates
 
 
 def validation_step(
@@ -142,12 +150,14 @@ def train(
     device: Literal["cpu", "cuda"] = "cpu",
 ) -> None:
     best_psnr = 0.0
+    metrics = Metrics()
+    metrics.epochs = epochs - start_epoch + 1
 
     try:
         for epoch in range(start_epoch, epochs + 1):
             start_time = time()
 
-            train_loss = train_step(
+            train_loss, learning_rates = train_step(
                 train_data_loader, model, loss_fn, optimizer, scaler, scheduler, device
             )
 
@@ -160,6 +170,12 @@ def train(
             remaining_time = format_time(end_time * (epochs - epoch))
 
             current_lr = optimizer.param_groups[0]["lr"]
+
+            metrics.learning_rates.extend(learning_rates)
+            metrics.train_losses.append(train_loss)
+            metrics.val_losses.append(val_loss)
+            metrics.psnrs.append(val_psnr)
+            metrics.ssims.append(val_ssim)
 
             logger.info(
                 f"Epoch: {epoch}/{epochs} ({epoch_time}/{remaining_time}) | LR: {current_lr:.2e} | T loss: {train_loss:.4f} | V loss: {val_loss:.4f} | PSNR: {val_psnr:.2f} | SSIM: {val_ssim:.2f}"
@@ -175,6 +191,9 @@ def train(
                     optimizer,
                     scaler,
                 )
+
+        plot_training_metrics(metrics)
+
     except KeyboardInterrupt:
         save_checkpoint(
             MODEL_CHECKPOINT_PATH,
