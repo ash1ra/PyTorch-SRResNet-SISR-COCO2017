@@ -9,8 +9,14 @@ from config import create_logger
 from model import SRResNet
 from utils import compare_images, inverse_tta_transform, load_checkpoint, tta_transforms
 
-INPUT_PATH = Path("images/baboon.png")
-OUTPUT_PATH = Path("images/result.png")
+# INPUT_PATH = Path("images/1.jpg")
+# OUTPUT_PATH = Path("images/result_1.png")
+# COMPARISON_IMAGE_PATH = Path("images/comparison_image_1.png")
+
+INPUT_PATH = Path("data/Set14/baboon.png")
+OUTPUT_PATH = Path("images/sr_baboon.png")
+COMPARISON_IMAGE_PATH = Path("images/comparison_baboon.png")
+
 SCALING_FACTOR: Literal[2, 4, 8] = 4
 N_CHANNELS = 64
 N_RES_BLOCKS = 16
@@ -28,7 +34,8 @@ logger = create_logger(log_level="INFO")
 def upscale_image(
     input_path: Path,
     output_path: Path,
-    scaling_factor: Literal[2, 4, 8],
+    comparison_image_path: Path | None,
+    scaling_factor: Literal[2, 4, 8] = 4,
     use_tta: bool = True,
     device: Literal["cpu", "cuda"] = "cpu",
 ) -> None:
@@ -76,19 +83,18 @@ def upscale_image(
     with torch.inference_mode():
         if use_tta:
             sr_images = []
-
             for tta_transform in tta_transforms:
                 sr_image_tensor = model(tta_transform(img_tensor))
                 sr_image_tensor = inverse_tta_transform(sr_image_tensor, tta_transform)
                 sr_images.append(sr_image_tensor)
-
             sr_image_tensor = torch.mean(torch.stack(sr_images), dim=0)
         else:
             sr_image_tensor = model(img_tensor)
 
-    compare_images(
-        img_tensor, sr_image_tensor, "images/comparison_image.png", scaling_factor
-    )
+    if comparison_image_path:
+        compare_images(
+            img_tensor, sr_image_tensor, comparison_image_path, scaling_factor
+        )
 
     sr_image_tensor = (sr_image_tensor + 1) / 2
     sr_image_tensor = sr_image_tensor.clamp(0, 1) * 255
@@ -109,6 +115,7 @@ def main() -> None:
     upscale_image(
         input_path=INPUT_PATH,
         output_path=OUTPUT_PATH,
+        comparison_image_path=COMPARISON_IMAGE_PATH,
         scaling_factor=SCALING_FACTOR,
         use_tta=True,
         device=device,
