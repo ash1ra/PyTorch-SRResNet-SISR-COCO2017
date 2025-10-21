@@ -160,52 +160,67 @@ def load_checkpoint(
 
 
 def compare_images(
-    hr_img_tensor: Tensor,
+    lr_img_tensor: Tensor,
     sr_img_tensor: Tensor,
     output_path: str | Path,
+    scaling_factor: Literal[2, 4, 8] = 4,
 ) -> None:
-    hr_label = "Original"
-    sr_label = "Upscaled"
+    bicubic_label = "Bicubic"
+    sr_label = "SRResNet"
 
-    hr_img_tensor = (hr_img_tensor + 1) / 2
-    hr_img_tensor = hr_img_tensor.clamp(0, 1) * 255
-    hr_img_tensor.squeeze_(0)
+    lr_img_tensor = (lr_img_tensor + 1) / 2
+    lr_img_tensor = lr_img_tensor.clamp(0, 1) * 255
+    if lr_img_tensor.dim() == 4:
+        lr_img_tensor.squeeze_(0)
 
     sr_img_tensor = (sr_img_tensor + 1) / 2
     sr_img_tensor = sr_img_tensor.clamp(0, 1) * 255
-    sr_img_tensor.squeeze_(0)
+    if sr_img_tensor.dim() == 4:
+        sr_img_tensor.squeeze_(0)
 
-    to_pil_transform = transforms.ToPILImage()
-    hr_img = to_pil_transform(hr_img_tensor.byte())
-    sr_img = to_pil_transform(sr_img_tensor.byte())
+    bicubic_transform = transforms.Compose(
+        [
+            transforms.ToPILImage(),
+            transforms.Resize(
+                size=(sr_img_tensor.shape[1], sr_img_tensor.shape[2]),
+                interpolation=InterpolationMode.BICUBIC,
+            ),
+        ]
+    )
+    bicubic_img = bicubic_transform(lr_img_tensor.byte())
 
-    width, height = hr_img.size
-    sr_img = sr_img.resize((width, height), Image.Resampling.BICUBIC)
+    sr_img = transforms.ToPILImage()(sr_img_tensor.byte())
+
+    width, height = sr_img.size
 
     total_width = width
     total_height = height * 2 + 100
     comparison_img = Image.new("RGB", (total_width, total_height), color="white")
 
-    comparison_img.paste(hr_img, (0, 50))
+    comparison_img.paste(bicubic_img, (0, 50))
     comparison_img.paste(sr_img, (0, height + 100))
 
-    draw = ImageDraw.Draw(comparison_img)
+    draw = ImageDraw.Draw((comparison_img))
 
     try:
         font = ImageFont.truetype(
-            "/usr/share/fonts/TTF/JetBrainsMonoNerdFont-Regular.ttf", size=18
+            "/usr/share/fonts/TTF/JetBrainsMonoNerdFont-Regular.ttf", size=36
         )
     except OSError:
         font = ImageFont.load_default()
 
+    bicubic_text_width = draw.textlength(bicubic_label, font=font)
+    sr_text_width = draw.textlength(sr_label, font=font)
+
     draw.text(
-        (width // 2 - len(hr_label) * 5, 15),
-        hr_label,
+        ((width - bicubic_text_width) / 2, 5),
+        bicubic_label,
         fill="black",
         font=font,
     )
+
     draw.text(
-        (width // 2 - len(sr_label) * 5, height + 65),
+        ((width - sr_text_width) / 2, height + 55),
         sr_label,
         fill="black",
         font=font,
@@ -214,8 +229,6 @@ def compare_images(
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     comparison_img.save(output_path, format="PNG")
-
-    logger.debug(f"Comparison image was saved to {output_path}")
 
 
 def rgb_to_ycbcr(image_tensor: torch.Tensor) -> torch.Tensor:

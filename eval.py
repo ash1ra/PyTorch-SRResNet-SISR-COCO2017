@@ -9,7 +9,7 @@ from config import create_logger
 from model import SRResNet
 from utils import compare_images, inverse_tta_transform, load_checkpoint, tta_transforms
 
-INPUT_PATH = Path("images/1.jpg")
+INPUT_PATH = Path("images/baboon.png")
 OUTPUT_PATH = Path("images/result.png")
 SCALING_FACTOR: Literal[2, 4, 8] = 4
 N_CHANNELS = 64
@@ -86,16 +86,18 @@ def upscale_image(
         else:
             sr_image_tensor = model(img_tensor)
 
-    compare_images(img_tensor, sr_image_tensor, "images/comparison_image.png")
+    compare_images(
+        img_tensor, sr_image_tensor, "images/comparison_image.png", scaling_factor
+    )
 
     sr_image_tensor = (sr_image_tensor + 1) / 2
     sr_image_tensor = sr_image_tensor.clamp(0, 1) * 255
-    sr_image_tensor = sr_image_tensor.squeeze(0).byte()
+    sr_image_tensor = sr_image_tensor.squeeze(0)
 
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    sr_image = transforms.ToPILImage()(sr_image_tensor)
+    sr_image = transforms.ToPILImage()(sr_image_tensor.byte())
     sr_image.save(output_path, format="PNG")
 
     logger.info(f"Upscaled image was saved to {output_path}")
