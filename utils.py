@@ -8,7 +8,7 @@ from PIL import Image, ImageDraw, ImageFont
 from safetensors.torch import load_file, save_file
 from torch import Tensor, nn, optim
 from torch.amp import GradScaler
-from torch.optim.lr_scheduler import OneCycleLR
+from torch.optim.lr_scheduler import MultiStepLR
 from torchvision.io import decode_image
 from torchvision.transforms import InterpolationMode
 from torchvision.transforms import v2 as transforms
@@ -124,7 +124,7 @@ def save_checkpoint(
     optimizer: optim.Optimizer,
     metrics: Metrics,
     scaler: GradScaler | None = None,
-    scheduler: OneCycleLR | None = None,
+    scheduler: MultiStepLR | None = None,
 ) -> None:
     Path(model_filepath).parent.mkdir(parents=True, exist_ok=True)
     Path(state_filepath).parent.mkdir(parents=True, exist_ok=True)
@@ -155,7 +155,7 @@ def load_checkpoint(
     optimizer: optim.Optimizer,
     metrics: Metrics | None = None,
     scaler: GradScaler | None = None,
-    scheduler: OneCycleLR | None = None,
+    scheduler: MultiStepLR | None = None,
     device: Literal["cpu", "cuda"] = "cpu",
 ) -> int:
     if Path(model_filepath).exists() and Path(state_filepath).exists():
@@ -289,14 +289,13 @@ def format_time(total_seconds: float) -> str:
 
 
 def plot_training_metrics(metrics: Metrics) -> None:
-    batches = list(range(0, len(metrics.learning_rates)))
     epochs = list(range(0, metrics.epochs))
 
     fig, axs = plt.subplots(2, 2, figsize=(12, 8))
     fig.suptitle("SRResNet Metrics", fontsize=16)
 
-    axs[0, 0].plot(batches, metrics.learning_rates, color="b")
-    axs[0, 0].set_xlabel("Batches")
+    axs[0, 0].plot(epochs, metrics.learning_rates, color="b")
+    axs[0, 0].set_xlabel("Epochs")
     axs[0, 0].set_ylabel("Learning Rate")
     axs[0, 0].grid(True)
 

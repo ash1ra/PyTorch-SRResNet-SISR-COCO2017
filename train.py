@@ -5,7 +5,7 @@ from typing import Literal
 import torch
 from torch import nn, optim
 from torch.amp import GradScaler, autocast
-from torch.optim.lr_scheduler import OneCycleLR
+from torch.optim.lr_scheduler import MultiStepLR
 from torch.utils.data import DataLoader
 from torchmetrics.image import PeakSignalNoiseRatio, StructuralSimilarityIndexMeasure
 
@@ -24,17 +24,16 @@ from utils import (
 SCALING_FACTOR: Literal[2, 4, 8] = 4
 CROP_SIZE = 128
 
-N_CHANNELS = 96
+N_CHANNELS = 64
 N_RES_BLOCKS = 16
 LARGE_KERNEL_SIZE = 9
 SMALL_KERNEL_SIZE = 3
 
 BATCH_SIZE = 32
-LEARNING_RATE = 1e-5
-MAX_LEARNING_RATE = 1e-3
-EPOCHS = 10
-LOAD_MODEL = True
-DEV_MODE = True
+LEARNING_RATE = 1e-4
+EPOCHS = 100
+LOAD_MODEL = False
+DEV_MODE = False
 
 NUM_WORKERS = 8
 
@@ -55,7 +54,7 @@ def train_step(
     loss_fn: nn.Module,
     optimizer: optim.Optimizer,
     scaler: GradScaler | None,
-    scheduler: OneCycleLR | None,
+    scheduler: MultiStepLR | None,
     device: Literal["cpu", "cuda"] = "cpu",
 ) -> tuple[float, list[float]]:
     total_loss = 0
@@ -86,10 +85,6 @@ def train_step(
         else:
             loss.backward()
             optimizer.step()
-
-        if scheduler:
-            scheduler.step()
-            learning_rates.append(optimizer.param_groups[0]["lr"])
 
         if i % 500 == 0:
             logger.debug(f"Processing batch {i}/{len(data_loader)}...")
@@ -150,7 +145,7 @@ def train(
     ssim_metric: StructuralSimilarityIndexMeasure,
     metrics: Metrics,
     scaler: GradScaler | None = None,
-    scheduler: OneCycleLR | None = None,
+    scheduler: MultiStepLR | None = None,
     device: Literal["cpu", "cuda"] = "cpu",
 ) -> None:
     best_psnr = 0.0
@@ -170,13 +165,16 @@ def train(
                 val_data_loader, model, loss_fn, psnr_metric, ssim_metric, device
             )
 
+            if scheduler:
+                scheduler.step()
+
             end_time = time() - start_time
             epoch_time = format_time(end_time)
             remaining_time = format_time(end_time * (epochs - epoch))
 
             current_lr = optimizer.param_groups[0]["lr"]
 
-            metrics.learning_rates.extend(learning_rates)
+            metrics.learning_rates.append(current_lr)
             metrics.train_losses.append(train_loss)
             metrics.val_losses.append(val_loss)
             metrics.psnrs.append(val_psnr)
@@ -261,12 +259,10 @@ def main() -> None:
 
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
     scaler = GradScaler(device) if device == "cuda" else None
-    scheduler = OneCycleLR(
+    scheduler = MultiStepLR(
         optimizer=optimizer,
-        max_lr=MAX_LEARNING_RATE,
-        total_steps=EPOCHS * len(train_data_loader),
-        div_factor=MAX_LEARNING_RATE / LEARNING_RATE,
-        final_div_factor=100,
+        milestones=[50],
+        gamma=0.1,
     )
 
     if LOAD_MODEL:
@@ -282,12 +278,8 @@ def main() -> None:
         )
 
         if scheduler and start_epoch > 1:
-            steps_to_take = (start_epoch - 1) * len(train_data_loader)
-            for _ in range(steps_to_take):
-                scheduler.step()
-            logger.info(
-                f"Scheduler advanced to step {steps_to_take} for epoch {start_epoch}"
-            )
+            scheduler.last_epoch = start_epoch - 1
+            logger.info(f"Scheduler synchronized to epoch {start_epoch - 1}")
     else:
         start_epoch = 1
 

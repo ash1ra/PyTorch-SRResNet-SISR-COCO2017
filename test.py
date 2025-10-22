@@ -13,7 +13,7 @@ from utils import inverse_tta_transform, load_checkpoint, rgb_to_ycbcr, tta_tran
 
 SCALING_FACTOR: Literal[2, 4, 8] = 4
 
-N_CHANNELS = 96
+N_CHANNELS = 64
 N_RES_BLOCKS = 16
 LARGE_KERNEL_SIZE = 9
 SMALL_KERNEL_SIZE = 3
