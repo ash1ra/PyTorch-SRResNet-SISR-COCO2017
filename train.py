@@ -32,9 +32,9 @@ SMALL_KERNEL_SIZE = 3
 BATCH_SIZE = 32
 LEARNING_RATE = 1e-5
 MAX_LEARNING_RATE = 1e-3
-EPOCHS = 100
-LOAD_MODEL = False
-DEV_MODE = False
+EPOCHS = 10
+LOAD_MODEL = True
+DEV_MODE = True
 
 NUM_WORKERS = 8
 
@@ -148,13 +148,15 @@ def train(
     epochs: int,
     psnr_metric: PeakSignalNoiseRatio,
     ssim_metric: StructuralSimilarityIndexMeasure,
+    metrics: Metrics,
     scaler: GradScaler | None = None,
     scheduler: OneCycleLR | None = None,
     device: Literal["cpu", "cuda"] = "cpu",
 ) -> None:
     best_psnr = 0.0
-    metrics = Metrics()
-    metrics.epochs = epochs - start_epoch + 1
+
+    if not metrics.epochs:
+        metrics.epochs = epochs - start_epoch + 1
 
     try:
         for epoch in range(start_epoch, epochs + 1):
@@ -192,6 +194,7 @@ def train(
                     epoch,
                     model,
                     optimizer,
+                    metrics,
                     scaler,
                 )
 
@@ -204,6 +207,7 @@ def train(
             epoch,
             model,
             optimizer,
+            metrics,
             scaler,
         )
         exit(0)
@@ -253,6 +257,7 @@ def main() -> None:
     loss_fn = nn.MSELoss()
     psnr_metric = PeakSignalNoiseRatio(data_range=1.0).to(device)
     ssim_metric = StructuralSimilarityIndexMeasure(data_range=1.0).to(device)
+    metrics = Metrics()
 
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
     scaler = GradScaler(device) if device == "cuda" else None
@@ -270,10 +275,19 @@ def main() -> None:
             STATE_CHECKPOINT_PATH,
             model,
             optimizer,
+            metrics,
             scaler,
             scheduler,
             device,
         )
+
+        if scheduler and start_epoch > 1:
+            steps_to_take = (start_epoch - 1) * len(train_data_loader)
+            for _ in range(steps_to_take):
+                scheduler.step()
+            logger.info(
+                f"Scheduler advanced to step {steps_to_take} for epoch {start_epoch}"
+            )
     else:
         start_epoch = 1
 
@@ -287,6 +301,7 @@ def main() -> None:
         epochs=EPOCHS,
         psnr_metric=psnr_metric,
         ssim_metric=ssim_metric,
+        metrics=metrics,
         scaler=scaler,
         scheduler=scheduler,
         device=device,

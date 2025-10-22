@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from typing import Literal
 
@@ -58,8 +58,8 @@ def transform_image(
         ]
     )
 
-    if not test_mode:
-        hr_img_tensor = augmentation_transform(hr_img_tensor)
+    # if not test_mode:
+    #     hr_img_tensor = augmentation_transform(hr_img_tensor)
 
     if test_mode:
         _, height, width = img_tensor.shape
@@ -122,6 +122,7 @@ def save_checkpoint(
     epoch: int,
     model: nn.Module,
     optimizer: optim.Optimizer,
+    metrics: Metrics,
     scaler: GradScaler | None = None,
     scheduler: OneCycleLR | None = None,
 ) -> None:
@@ -133,6 +134,7 @@ def save_checkpoint(
     state_dict = {
         "optimizer_state_dict": optimizer.state_dict(),
         "epoch": epoch,
+        "metrics": asdict(metrics),
     }
 
     if scaler:
@@ -151,6 +153,7 @@ def load_checkpoint(
     state_filepath: str,
     model: nn.Module,
     optimizer: optim.Optimizer,
+    metrics: Metrics | None = None,
     scaler: GradScaler | None = None,
     scheduler: OneCycleLR | None = None,
     device: Literal["cpu", "cuda"] = "cpu",
@@ -161,6 +164,15 @@ def load_checkpoint(
         checkpoint_dict = torch.load(state_filepath, map_location=device)
 
         optimizer.load_state_dict(checkpoint_dict["optimizer_state_dict"])
+
+        if metrics and "metrics" in checkpoint_dict:
+            metrics_dict = checkpoint_dict["metrics"]
+            metrics.epochs = metrics_dict["epochs"]
+            metrics.learning_rates = metrics_dict["learning_rates"]
+            metrics.train_losses = metrics_dict["train_losses"]
+            metrics.val_losses = metrics_dict["val_losses"]
+            metrics.psnrs = metrics_dict["psnrs"]
+            metrics.ssims = metrics_dict["ssims"]
 
         if scaler and "scaler_state_dict" in checkpoint_dict:
             scaler.load_state_dict(checkpoint_dict["scaler_state_dict"])
