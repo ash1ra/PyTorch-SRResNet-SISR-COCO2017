@@ -2,6 +2,7 @@ import math
 from typing import Literal
 
 from torch import Tensor, nn
+from torch.nn import init
 
 
 class ConvBlock(nn.Module):
@@ -103,7 +104,6 @@ class SRResNet(nn.Module):
             in_channels=3,
             out_channels=n_channels,
             kernel_size=large_kernel_size,
-            norm_layer=True,
             activation="prelu",
         )
 
