@@ -31,9 +31,11 @@ LARGE_KERNEL_SIZE = 9
 SMALL_KERNEL_SIZE = 3
 
 BATCH_SIZE = 32
-LEARNING_RATE = 1e-4
-EPOCHS = 100
-LOAD_MODEL = False
+LEARNING_RATE = 1e-5
+MAX_LEARNING_RATE = 1e-4
+EPOCHS = 10
+LOAD_MODEL = True
+LOAD_BEST_MODEL = False
 DEV_MODE = False
 
 NUM_WORKERS = 8
@@ -45,6 +47,8 @@ CHECKPOINTS_DIR = Path("checkpoints")
 MODEL_NAME = "srresnet"
 MODEL_CHECKPOINT_PATH = CHECKPOINTS_DIR / f"{MODEL_NAME}_model.safetensors"
 STATE_CHECKPOINT_PATH = CHECKPOINTS_DIR / f"{MODEL_NAME}_state.pth"
+BEST_MODEL_CHECKPOINT_PATH = CHECKPOINTS_DIR / f"{MODEL_NAME}_model_best.safetensors"
+BEST_STATE_CHECKPOINT_PATH = CHECKPOINTS_DIR / f"{MODEL_NAME}_state_best.pth"
 
 logger = create_logger(log_level="INFO")
 
@@ -157,10 +161,27 @@ def train(
     scheduler: OneCycleLR | None = None,
     device: Literal["cpu", "cuda"] = "cpu",
 ) -> None:
-    best_psnr = 0.0
+    if metrics.psnrs:
+        best_psnr = max(metrics.psnrs)
+    else:
+        best_psnr = 0.0
 
     if not metrics.epochs:
         metrics.epochs = epochs - start_epoch + 1
+
+    logger.info("-" * 107)
+    logger.info("Model parameters:")
+    logger.info(f"Scaling factor: {SCALING_FACTOR}")
+    logger.info(f"Crop size: {CROP_SIZE}")
+    logger.info(f"Number of channels: {N_CHANNELS}")
+    logger.info(f"Number of residual blocks: {N_RES_BLOCKS}")
+    logger.info(f"Batch size: {BATCH_SIZE}")
+    logger.info(f"Learning rate: {LEARNING_RATE}")
+    logger.info(f"Epochs: {EPOCHS}")
+    logger.info(f"Number of workers: {NUM_WORKERS}")
+    logger.info(f"Dev mode: {DEV_MODE}")
+    logger.info("-" * 107)
+    logger.info("Starting model training...")
 
     try:
         for epoch in range(start_epoch, epochs + 1):
@@ -193,8 +214,8 @@ def train(
             if val_psnr > best_psnr:
                 best_psnr = val_psnr
                 save_checkpoint(
-                    MODEL_CHECKPOINT_PATH,
-                    STATE_CHECKPOINT_PATH,
+                    BEST_MODEL_CHECKPOINT_PATH,
+                    BEST_STATE_CHECKPOINT_PATH,
                     epoch,
                     model,
                     optimizer,
@@ -217,6 +238,7 @@ def train(
         plot_training_metrics(metrics, hyperparameters_str)
 
     except KeyboardInterrupt:
+        logger.info("Save model's weights and finish training...")
         save_checkpoint(
             MODEL_CHECKPOINT_PATH,
             STATE_CHECKPOINT_PATH,
@@ -285,10 +307,21 @@ def main() -> None:
         final_div_factor=100,
     )
 
-    if LOAD_MODEL:
+    if LOAD_MODEL and (
+        BEST_MODEL_CHECKPOINT_PATH.exists() or MODEL_CHECKPOINT_PATH.exists()
+    ):
+        if LOAD_BEST_MODEL and BEST_MODEL_CHECKPOINT_PATH.exists():
+            model_to_load = BEST_MODEL_CHECKPOINT_PATH
+            state_to_load = BEST_STATE_CHECKPOINT_PATH
+            logger.info(f"Loading best checkpoint from {model_to_load.name}")
+        elif MODEL_CHECKPOINT_PATH.exists():
+            model_to_load = MODEL_CHECKPOINT_PATH
+            state_to_load = STATE_CHECKPOINT_PATH
+            logger.info(f"Loading checkpoint from {model_to_load.name}")
+
         start_epoch = load_checkpoint(
-            MODEL_CHECKPOINT_PATH,
-            STATE_CHECKPOINT_PATH,
+            model_to_load,
+            state_to_load,
             model,
             optimizer,
             metrics,
@@ -309,6 +342,7 @@ def main() -> None:
                 f"Scheduler advanced to step {steps_to_take} for epoch {start_epoch - 1}"
             )
     else:
+        logger.info("No checkpoints were found, start training from the beginning")
         start_epoch = 1
 
     train(
