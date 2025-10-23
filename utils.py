@@ -1,8 +1,10 @@
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
 import matplotlib.pyplot as plt
+import seaborn as sns
 import torch
 from PIL import Image, ImageDraw, ImageFont
 from safetensors.torch import load_file, save_file
@@ -288,33 +290,79 @@ def format_time(total_seconds: float) -> str:
     return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
 
 
-def plot_training_metrics(metrics: Metrics) -> None:
-    epochs = list(range(0, metrics.epochs))
+def plot_training_metrics(metrics: Metrics, hyperparameters_str: str) -> None:
+    sns.set_style("whitegrid")
+    sns.set_palette("deep")
+    palette = sns.color_palette("deep")
 
-    fig, axs = plt.subplots(2, 2, figsize=(12, 8))
-    fig.suptitle("SRResNet Metrics", fontsize=16)
+    batches = list(range(0, len(metrics.learning_rates)))
+    epochs = list(range(0, len(metrics.train_losses)))
 
-    axs[0, 0].plot(epochs, metrics.learning_rates, color="b")
-    axs[0, 0].set_xlabel("Epochs")
+    fig, axs = plt.subplots(2, 2, figsize=(14, 10))
+    fig.suptitle("SRResNet Training Metrics", fontsize=18)
+
+    fig.text(0.5, 0.94, hyperparameters_str, ha="center", va="top", fontsize=10)
+
+    sns.lineplot(
+        x=batches,
+        y=metrics.learning_rates,
+        ax=axs[0, 0],
+        linewidth=2.5,
+        color=palette[2],
+    )
+    axs[0, 0].set_title("Learning rate changes with OneCycleLR scheduler")
+    axs[0, 0].set_xlabel("Batches")
     axs[0, 0].set_ylabel("Learning Rate")
-    axs[0, 0].grid(True)
 
-    axs[0, 1].plot(epochs, metrics.train_losses, label="Train Loss", color="g")
-    axs[0, 1].plot(epochs, metrics.val_losses, label="Val Loss", color="r")
+    sns.lineplot(
+        x=epochs,
+        y=metrics.train_losses,
+        label="Train loss",
+        ax=axs[0, 1],
+        linewidth=2.5,
+        color=palette[0],
+    )
+    sns.lineplot(
+        x=epochs,
+        y=metrics.val_losses,
+        label="Val loss",
+        ax=axs[0, 1],
+        linewidth=2.5,
+        color=palette[1],
+    )
+    axs[0, 1].set_title("Training and validation losses")
     axs[0, 1].set_xlabel("Epoch")
     axs[0, 1].set_ylabel("Loss")
-    axs[0, 1].legend()
-    axs[0, 1].grid(True)
 
-    axs[1, 0].plot(epochs, metrics.psnrs, color="r")
+    sns.lineplot(
+        x=epochs,
+        y=metrics.psnrs,
+        ax=axs[1, 0],
+        linewidth=2.5,
+        color=palette[1],
+    )
+    axs[1, 0].set_title("Validation Peak Signal-to-Noise Ratio")
     axs[1, 0].set_xlabel("Epoch")
     axs[1, 0].set_ylabel("PSNR")
-    axs[1, 0].grid(True)
 
-    axs[1, 1].plot(epochs, metrics.ssims, color="r")
+    sns.lineplot(
+        x=epochs,
+        y=metrics.ssims,
+        ax=axs[1, 1],
+        linewidth=2.5,
+        color=palette[1],
+    )
+    axs[1, 1].set_title("Validation Structural Similarity Index Measure")
     axs[1, 1].set_xlabel("Epoch")
     axs[1, 1].set_ylabel("SSIM")
-    axs[1, 1].grid(True)
 
-    plt.tight_layout()
+    plt.tight_layout(rect=[0, 0.03, 1, 0.94])
+
+    output_path = (
+        Path("images")
+        / f"training_metrics_{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.png"
+    )
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    plt.savefig(output_path, dpi=300, bbox_inches="tight")
+
     plt.show()

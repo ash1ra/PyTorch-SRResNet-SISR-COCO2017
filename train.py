@@ -196,7 +196,19 @@ def train(
                     scaler,
                 )
 
-        plot_training_metrics(metrics)
+        save_checkpoint(
+            MODEL_CHECKPOINT_PATH,
+            STATE_CHECKPOINT_PATH,
+            epoch,
+            model,
+            optimizer,
+            metrics,
+            scaler,
+        )
+
+        hyperparameters_str = f"Scaling factor: {SCALING_FACTOR} | Crop size: {CROP_SIZE} | Number of channels: {N_CHANNELS} | Number of residual blocks: {N_RES_BLOCKS} | Batch size: {BATCH_SIZE} | Learning rate: {LEARNING_RATE} | Epochs: {EPOCHS} | Number of workers: {NUM_WORKERS} | Dev mode: {DEV_MODE}"
+
+        plot_training_metrics(metrics, hyperparameters_str)
 
     except KeyboardInterrupt:
         save_checkpoint(
