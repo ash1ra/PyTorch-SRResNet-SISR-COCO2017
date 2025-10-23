@@ -1,3 +1,4 @@
+import warnings
 from pathlib import Path
 from time import time
 from typing import Literal
@@ -5,7 +6,7 @@ from typing import Literal
 import torch
 from torch import nn, optim
 from torch.amp import GradScaler, autocast
-from torch.optim.lr_scheduler import MultiStepLR
+from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.data import DataLoader
 from torchmetrics.image import PeakSignalNoiseRatio, StructuralSimilarityIndexMeasure
 
@@ -54,7 +55,7 @@ def train_step(
     loss_fn: nn.Module,
     optimizer: optim.Optimizer,
     scaler: GradScaler | None,
-    scheduler: MultiStepLR | None,
+    scheduler: OneCycleLR | None,
     device: Literal["cpu", "cuda"] = "cpu",
 ) -> tuple[float, list[float]]:
     total_loss = 0
@@ -85,6 +86,10 @@ def train_step(
         else:
             loss.backward()
             optimizer.step()
+
+        if scheduler:
+            scheduler.step()
+            learning_rates.append(optimizer.param_groups[0]["lr"])
 
         if i % 500 == 0:
             logger.debug(f"Processing batch {i}/{len(data_loader)}...")
@@ -145,7 +150,7 @@ def train(
     ssim_metric: StructuralSimilarityIndexMeasure,
     metrics: Metrics,
     scaler: GradScaler | None = None,
-    scheduler: MultiStepLR | None = None,
+    scheduler: OneCycleLR | None = None,
     device: Literal["cpu", "cuda"] = "cpu",
 ) -> None:
     best_psnr = 0.0
@@ -165,16 +170,13 @@ def train(
                 val_data_loader, model, loss_fn, psnr_metric, ssim_metric, device
             )
 
-            if scheduler:
-                scheduler.step()
-
             end_time = time() - start_time
             epoch_time = format_time(end_time)
             remaining_time = format_time(end_time * (epochs - epoch))
 
             current_lr = optimizer.param_groups[0]["lr"]
 
-            metrics.learning_rates.append(current_lr)
+            metrics.learning_rates.extend(learning_rates)
             metrics.train_losses.append(train_loss)
             metrics.val_losses.append(val_loss)
             metrics.psnrs.append(val_psnr)
@@ -271,10 +273,12 @@ def main() -> None:
 
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
     scaler = GradScaler(device) if device == "cuda" else None
-    scheduler = MultiStepLR(
+    scheduler = OneCycleLR(
         optimizer=optimizer,
-        milestones=[50],
-        gamma=0.1,
+        max_lr=MAX_LEARNING_RATE,
+        total_steps=EPOCHS * len(train_data_loader),
+        div_factor=MAX_LEARNING_RATE / LEARNING_RATE,
+        final_div_factor=100,
     )
 
     if LOAD_MODEL:
@@ -290,8 +294,16 @@ def main() -> None:
         )
 
         if scheduler and start_epoch > 1:
-            scheduler.last_epoch = start_epoch - 1
-            logger.info(f"Scheduler synchronized to epoch {start_epoch - 1}")
+            steps_to_take = (start_epoch - 1) * len(train_data_loader)
+
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", UserWarning)
+                for _ in range(steps_to_take):
+                    scheduler.step()
+
+            logger.info(
+                f"Scheduler advanced to step {steps_to_take} for epoch {start_epoch - 1}"
+            )
     else:
         start_epoch = 1
 

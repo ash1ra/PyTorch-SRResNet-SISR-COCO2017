@@ -10,7 +10,7 @@ from PIL import Image, ImageDraw, ImageFont
 from safetensors.torch import load_file, save_file
 from torch import Tensor, nn, optim
 from torch.amp import GradScaler
-from torch.optim.lr_scheduler import MultiStepLR
+from torch.optim.lr_scheduler import OneCycleLR
 from torchvision.io import decode_image
 from torchvision.transforms import InterpolationMode
 from torchvision.transforms import v2 as transforms
@@ -127,7 +127,7 @@ def save_checkpoint(
     optimizer: optim.Optimizer,
     metrics: Metrics,
     scaler: GradScaler | None = None,
-    scheduler: MultiStepLR | None = None,
+    scheduler: OneCycleLR | None = None,
 ) -> None:
     Path(model_filepath).parent.mkdir(parents=True, exist_ok=True)
     Path(state_filepath).parent.mkdir(parents=True, exist_ok=True)
@@ -158,7 +158,7 @@ def load_checkpoint(
     optimizer: optim.Optimizer,
     metrics: Metrics | None = None,
     scaler: GradScaler | None = None,
-    scheduler: MultiStepLR | None = None,
+    scheduler: OneCycleLR | None = None,
     device: Literal["cpu", "cuda"] = "cpu",
 ) -> int:
     if Path(model_filepath).exists() and Path(state_filepath).exists():
