@@ -2,7 +2,6 @@ import math
 from typing import Literal
 
 from torch import Tensor, nn
-from torch.nn import init
 
 
 class ConvBlock(nn.Module):

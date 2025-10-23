@@ -9,16 +9,16 @@ from config import create_logger
 from model import SRResNet
 from utils import compare_images, inverse_tta_transform, load_checkpoint, tta_transforms
 
-# INPUT_PATH = Path("images/1.jpg")
-# OUTPUT_PATH = Path("images/result_1.png")
-# COMPARISON_IMAGE_PATH = Path("images/comparison_image_1.png")
+# INPUT_PATH = Path("images/5.jpg")
+# OUTPUT_PATH = Path("images/result_5.png")
+# COMPARISON_IMAGE_PATH = Path("images/comparison_image_5.png")
 
 INPUT_PATH = Path("data/Set14/baboon.png")
 OUTPUT_PATH = Path("images/sr_baboon.png")
 COMPARISON_IMAGE_PATH = Path("images/comparison_baboon.png")
 
 SCALING_FACTOR: Literal[2, 4, 8] = 4
-N_CHANNELS = 64
+N_CHANNELS = 96
 N_RES_BLOCKS = 16
 LARGE_KERNEL_SIZE = 9
 SMALL_KERNEL_SIZE = 3
