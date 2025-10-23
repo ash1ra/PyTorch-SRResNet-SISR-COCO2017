@@ -127,6 +127,10 @@ def validation_step(
             psnr = psnr_metric(y_sr_tensor, y_hr_tensor)
             ssim = ssim_metric(y_sr_tensor, y_hr_tensor)
 
+            sf = SCALING_FACTOR
+            y_hr_tensor = y_hr_tensor[:, :, sf:-sf, sf:-sf]
+            y_sr_tensor = y_sr_tensor[:, :, sf:-sf, sf:-sf]
+
             total_loss += loss.item()
             total_psnr += psnr.item()
             total_ssim += ssim.item()

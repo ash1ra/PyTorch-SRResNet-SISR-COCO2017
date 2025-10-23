@@ -73,6 +73,10 @@ def test_step(
             y_hr_tensor = rgb_to_ycbcr(hr_image_tensor)
             y_sr_tensor = rgb_to_ycbcr(sr_image_tensor)
 
+            sf = SCALING_FACTOR
+            y_hr_tensor = y_hr_tensor[:, :, sf:-sf, sf:-sf]
+            y_sr_tensor = y_sr_tensor[:, :, sf:-sf, sf:-sf]
+
             psnr = psnr_metric(y_sr_tensor, y_hr_tensor)
             ssim = ssim_metric(y_sr_tensor, y_hr_tensor)
 
