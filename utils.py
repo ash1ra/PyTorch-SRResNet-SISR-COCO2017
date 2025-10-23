@@ -32,10 +32,19 @@ tta_transforms = [
     transforms.Compose([transforms.Lambda(lambda x: x)]),
     transforms.Compose([transforms.RandomHorizontalFlip(p=1.0)]),
     transforms.Compose([transforms.RandomVerticalFlip(p=1.0)]),
+    transforms.Compose([transforms.RandomRotation(degrees=[90, 90])]),
+    transforms.Compose([transforms.RandomRotation(degrees=[180, 180])]),
+    transforms.Compose([transforms.RandomRotation(degrees=[270, 270])]),
     transforms.Compose(
         [
             transforms.RandomHorizontalFlip(p=1.0),
+            transforms.RandomRotation(degrees=[90, 90]),
+        ]
+    ),
+    transforms.Compose(
+        [
             transforms.RandomVerticalFlip(p=1.0),
+            transforms.RandomRotation(degrees=[90, 90]),
         ]
     ),
 ]
@@ -55,7 +64,14 @@ def transform_image(
         [
             transforms.RandomHorizontalFlip(p=0.5),
             transforms.RandomVerticalFlip(p=0.5),
-            # transforms.RandomRotation(degrees=(0, 90), expand=True),
+            transforms.RandomChoice(
+                [
+                    transforms.RandomRotation(degrees=[0, 0]),
+                    transforms.RandomRotation(degrees=[90, 90]),
+                    transforms.RandomRotation(degrees=[180, 180]),
+                    transforms.RandomRotation(degrees=[270, 270]),
+                ]
+            ),
         ]
     )
 
@@ -110,11 +126,17 @@ def transform_image(
 
 
 def inverse_tta_transform(img_tensor: Tensor, transform: transforms.Compose) -> Tensor:
-    for t in transform.transforms:
-        if isinstance(t, transforms.RandomHorizontalFlip) or isinstance(
-            t, transforms.RandomVerticalFlip
+    for t in reversed(transform.transforms):
+        if isinstance(
+            t, (transforms.RandomHorizontalFlip, transforms.RandomVerticalFlip)
         ):
             img_tensor = t(img_tensor)
+        elif isinstance(t, transforms.RandomRotation):
+            if (angle := t.degrees[0]) != 0:
+                inverse_angle = -angle % 360
+                img_tensor = transforms.RandomRotation(
+                    degrees=[inverse_angle, inverse_angle]
+                )(img_tensor)
 
     return img_tensor
 
