@@ -10,7 +10,7 @@ from model import SRResNet
 from utils import compare_images, inverse_tta_transform, load_checkpoint, tta_transforms
 
 # INPUT_PATH = Path("images/5.jpg")
-# OUTPUT_PATH = Path("images/result_5.png")
+# OUTPUT_PATH = Path("images/sr_5.png")
 # COMPARISON_IMAGE_PATH = Path("images/comparison_image_5.png")
 
 INPUT_PATH = Path("data/Set14/baboon.png")
