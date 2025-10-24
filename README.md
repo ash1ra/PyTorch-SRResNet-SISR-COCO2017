@@ -1,4 +1,4 @@
-# PyTorch SRResNet for SISR task
+# PyTorch SRResNet for SISR task (WIP)
 
 This project implements a **SRResNet** (Super-Resolution Residual Network) model for **SISR** (Single Image Super-Resolution) task. The primary goal is to upscale low-resolution (LR) images by a given factor (2x, 4x, 8x) to produce super-resolution (SR) images with high fidelity and perceptual quality.
 
@@ -25,48 +25,48 @@ This implementation is based on the paper [Photo-Realistic Single Image Super-Re
 ## Model Architecture
 
 ```ascii
-                                             Input (LR Image)
-                                                    |
-                                                    v
-                                +-Input-Conv-Block-----------------------+
-                                | Conv2D (9x9 kernel) (3 -> 64 channels) |
-                                | PReLU                                  |
-                                +----------------------------------------+
-                                                    |
-                                                    +---------------------------+
-                                                    |                           |
-                                                    v                           |
-                          +-----+-16x-Residual-Blocks---------------------+     |
-                          |     | Conv2D (3x3 kernel) (64 -> 64 channels) |     |
-                          |     | Batch Normalization                     |     |
-        (Skip connection) |     | PReLU                                   |     | (Skip connection)
-                          |     | Conv2D (3x3 kernel) (64 -> 64 channels) |     |
-                          |     | Batch Normalization                     |     |
-                          +-----+-----------------------------------------+     |
-                                                    |                           |
-                                                    v                           |
-                                +-Middle-Conv-Block-----------------------+     |
-                                | Conv2D (3x3 kernel) (64 -> 64 channels) |     |
-                                | Batch Normalization                     |     |
-                                +-----------------------------------------+     |    
-                                                    |                           |
-                                                    +---------------------------+
-                                                    |
-                                                    v
-                                +-2x-Sub-pixel-Conv-Blocks-----------------+
-                                | Conv2D (3x3 kernel) (64 -> 256 channels) |
-                                | PixelShuffle (h, w, 256 -> 2h, 2w, 64)   |
-                                | PReLU                                    |
-                                +------------------------------------------+
-                                                    |
-                                                    v
-                                +-Final-Conv-Block-----------------------+
-                                | Conv2D (9x9 kernel) (64 -> 3 channels) |
-                                | Tanh                                   |
-                                +----------------------------------------+
-                                                    |
-                                                    v
-                                             Output (SR Image)
+                                     Input (LR Image)
+                                            |
+                                            v
+                        +-Input-Conv-Block-----------------------+
+                        | Conv2D (9x9 kernel) (3 -> 64 channels) |
+                        | PReLU                                  |
+                        +----------------------------------------+
+                                            |
+                                            +---------------------------+
+                                            |                           |
+                                            v                           |
+                  +-----+-16x-Residual-Blocks---------------------+     |
+                  |     | Conv2D (3x3 kernel) (64 -> 64 channels) |     |
+                  |     | Batch Normalization                     |     |
+(Skip connection) |     | PReLU                                   |     | (Skip connection)
+                  |     | Conv2D (3x3 kernel) (64 -> 64 channels) |     |
+                  |     | Batch Normalization                     |     |
+                  +-----+-----------------------------------------+     |
+                                            |                           |
+                                            v                           |
+                        +-Middle-Conv-Block-----------------------+     |
+                        | Conv2D (3x3 kernel) (64 -> 64 channels) |     |
+                        | Batch Normalization                     |     |
+                        +-----------------------------------------+     |    
+                                            |                           |
+                                            +---------------------------+
+                                            |
+                                            v
+                        +-2x-Sub-pixel-Conv-Blocks-----------------+
+                        | Conv2D (3x3 kernel) (64 -> 256 channels) |
+                        | PixelShuffle (h, w, 256 -> 2h, 2w, 64)   |
+                        | PReLU                                    |
+                        +------------------------------------------+
+                                            |
+                                            v
+                        +-Final-Conv-Block-----------------------+
+                        | Conv2D (9x9 kernel) (64 -> 3 channels) |
+                        | Tanh                                   |
+                        +----------------------------------------+
+                                            |
+                                            v
+                                     Output (SR Image)
 ```
 
 ## Datasets
@@ -164,7 +164,7 @@ source .venv/bin/activate
 
 ### 4. Testing
 
-To evaluate the model's performance on the benchmark datasets:
+To evaluate the model's performance on the test datasets:
 
 1.  Ensure the `MODEL_CHECKPOINT_PATH` in `test.py` points to your trained model (e.g., `srresnet_model_best.safetensors`).
 2.  Run the test script:
@@ -175,9 +175,9 @@ To evaluate the model's performance on the benchmark datasets:
 
 ### 5. Inference
 
-To upscale a single low-resolution image:
+To upscale a single image:
 
-1.  Place your LR image in the `images/` folder (or update the path).
+1.  Place your image in the `images/` folder (or update the path).
 2.  In `inference.py`, set `INPUT_PATH` to your image and `MODEL_CHECKPOINT_PATH` to your trained model.
 3.  Run the script:
     ```bash
@@ -233,3 +233,4 @@ The following images compare the standard Bicubic interpolation with the output 
 
 ## License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
