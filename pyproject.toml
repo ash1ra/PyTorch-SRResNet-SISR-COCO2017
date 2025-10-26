@@ -1,5 +1,5 @@
 [project]
-name = "SRResNet-SuperResolution-COCO2017"
+name = "PyTorch-SRResNet-SISR-COCO2017"
 version = "0.1.0"
 description = "PyTorch Super Resolution Residual Network trained on the COCO2017 dataset"
 readme = "README.md"

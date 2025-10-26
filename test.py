@@ -128,7 +128,13 @@ def main() -> None:
         )
 
         avg_loss, avg_psnr, avg_ssim = test_step(
-            data_loader, model, loss_fn, psnr_metric, ssim_metric, True, device
+            data_loader=data_loader,
+            model=model,
+            loss_fn=loss_fn,
+            psnr_metric=psnr_metric,
+            ssim_metric=ssim_metric,
+            use_tta=True,
+            device=device,
         )
 
         logger.info(
