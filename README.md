@@ -1,8 +1,14 @@
-# PyTorch SRResNet for SISR task (WIP)
+# PyTorch SRResNet for SISR task
 
 This project implements a **SRResNet** (Super-Resolution Residual Network) model for **SISR** (Single Image Super-Resolution) task. The primary goal is to upscale low-resolution (LR) images by a given factor (2x, 4x, 8x) to produce super-resolution (SR) images with high fidelity and perceptual quality.
 
 This implementation is based on the paper [Photo-Realistic Single Image Super-Resolution Using a Generative Adversarial Network](https://arxiv.org/abs/1609.04802) and inspired by the [sgrvinod/a-PyTorch-Tutorial-to-Super-Resolution](https://github.com/sgrvinod/a-PyTorch-Tutorial-to-Super-Resolution) tutorial.
+
+## Demonstration
+
+The following images compare the standard bicubic interpolation with the output of the SRResNet model.
+
+![Comparison image](images/comparison_img.png)
 
 ## Key Features
 
@@ -183,35 +189,36 @@ To upscale a single image:
     ```bash
     python inference.py
     ```
-4.  The upscaled image (`sr_*.png`) and a comparison image (`comparison_*.png`) will be saved in the `images/` directory.
+4.  The upscaled image (`sr_img_*.png`) and a comparison image (`comparison_img_*.png`) will be saved in the `images/` directory.
 
 ## Training Results
 
-![The following chart shows the progression of loss, learning rate, PSNR, and SSIM during training.](images/training_metrics.png)
+![The following chart shows the progression of loss, learning rate, PSNR, and SSIM during training.](images/training_metrics_final.png)
+![The following chart shows the progression of loss, learning rate, PSNR, and SSIM during training.](images/training_metrics_final_zoomed.png)
 
-The model was trained for 500 epochs with a batch size of 32 on an NVIDIA RTX 4060 Ti (8 GB). The rest of the hyperparameters are specified on the chart. The final model is the one with the highest PSNR value.
+The model was trained for 500 epochs with a batch size of 32 on an NVIDIA RTX 4060 Ti (8 GB) and took 59 hours. The rest of the hyperparameters are specified on the chart. The final model is the one with the highest PSNR value.
 
 ## Benchmark Evaluation (4x Upscaling)
 
 The final model (`srresnet_model_best.safetensors`) was evaluated on standard benchmark datasets using TTA. Metrics are calculated on the Y-channel after shaving 4px (the scaling factor) from the border.
 
-The results are compared against the original paper's SRResNet (trained on MSE) and the `sgrvinod` tutorial implementation.
+The results are compared against the original paper's SRResNet and the sgrvinod tutorial implementation.
 
 **PSNR (dB) Comparison**
 | Dataset / Implementation | SRResNet (this project) | SRResNet (sgrvinod) | SRResNet (paper)
 | :--- | :---: | :---: | :---: |
-| **Set5** | 0.0 | 31.927 | 32.05 |
-| **Set14** | 0.0 | 28.588 | 28.49 |
-| **BSDS100** | 0.0 | 27.587 | 27.58 |
-| **Urban100**| 0.0 | — | — |
+| **Set5** | 31.0983 | 31.927 | 32.05 |
+| **Set14** | 27.5783 | 28.588 | 28.49 |
+| **BSDS100** | 26.4378 | 27.587 | 27.58 |
+| **Urban100**| 25.3613 | — | — |
 
 **SSIM Comparison**
 | Dataset / Implementation | SRResNet (this project) | SRResNet (sgrvinod) | SRResNet (paper)
 | :--- | :---: | :---: | :---: |
-| **Set5** | 0.0 | 0.902  | 0.9019 |
-| **Set14** | 0.0 | 0.799 | 0.8184 |
-| **BSDS100** | 0.0 | 0.756 | 0.7620 |
-| **Urban100** | 0.0 | — | — |
+| **Set5** | 0.8849 | 0.902  | 0.9019 |
+| **Set14** | 0.7705 | 0.799 | 0.8184 |
+| **BSDS100** | 0.7232 | 0.756 | 0.7620 |
+| **Urban100** | 0.7889 | — | — |
 
 ***Note:*** *My results might be slightly different from the paper's, which is expected. The paper's authors may have used different training datasets (ImageNet vs COCO), different training durations, or minor variations in implementation.*
 
@@ -219,13 +226,13 @@ The results are compared against the original paper's SRResNet (trained on MSE) 
 
 ## Visual Comparisons
 
-The following images compare the standard Bicubic interpolation with the output of the SRResNet model.
+The following images compare the standard bicubic interpolation with the output of the SRResNet model. I tried to use different images that would be more clearly seen that the model handles well with anime/cartoon images and quite bad with photorealistic.
 
-![Comparisson image 1](images/comparison_image_1.png)
-![Comparisson image 2](images/comparison_image_2.png)
-![Comparisson image 3](images/comparison_image_3.png)
-![Comparisson image 4](images/comparison_image_4.png)
-![Comparisson image 5](images/comparison_image_5.png)
+![Comparisson image 1](images/comparison_img_1.png)
+![Comparisson image 2](images/comparison_img_2.png)
+![Comparisson image 3](images/comparison_img_3.png)
+![Comparisson image 4](images/comparison_img_4.png)
+![Comparisson image 5](images/comparison_img_5.png)
 
 ## Acknowledgements
 - This project is heavily inspired by the excellent [a-PyTorch-Tutorial-to-Super-Resolution](https://github.com/sgrvinod/a-PyTorch-Tutorial-to-Super-Resolution) by sgrvinod.
