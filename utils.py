@@ -32,19 +32,19 @@ tta_transforms = [
     transforms.Compose([transforms.Lambda(lambda x: x)]),
     transforms.Compose([transforms.RandomHorizontalFlip(p=1.0)]),
     transforms.Compose([transforms.RandomVerticalFlip(p=1.0)]),
-    transforms.Compose([transforms.RandomRotation(degrees=[90, 90])]),
-    transforms.Compose([transforms.RandomRotation(degrees=[180, 180])]),
-    transforms.Compose([transforms.RandomRotation(degrees=[270, 270])]),
+    transforms.Compose([transforms.RandomRotation(degrees=[90, 90], expand=True)]),
+    transforms.Compose([transforms.RandomRotation(degrees=[180, 180], expand = True)]),
+    transforms.Compose([transforms.RandomRotation(degrees=[270, 270], expand = True)]),
     transforms.Compose(
         [
             transforms.RandomHorizontalFlip(p=1.0),
-            transforms.RandomRotation(degrees=[90, 90]),
+            transforms.RandomRotation(degrees=[90, 90], expand = True),
         ]
     ),
     transforms.Compose(
         [
             transforms.RandomVerticalFlip(p=1.0),
-            transforms.RandomRotation(degrees=[90, 90]),
+            transforms.RandomRotation(degrees=[90, 90], expand = True),
         ]
     ),
 ]
@@ -133,11 +133,9 @@ def inverse_tta_transform(img_tensor: Tensor, transform: transforms.Compose) -> 
             img_tensor = t(img_tensor)
         elif isinstance(t, transforms.RandomRotation):
             if (angle := t.degrees[0]) != 0:
-                inverse_angle = -angle % 360
-                img_tensor = transforms.RandomRotation(
-                    degrees=[inverse_angle, inverse_angle]
-                )(img_tensor)
-
+                k = round(angle / 90)
+                inverse_k = (4 - k) % 4
+                img_tensor = torch.rot90(img_tensor, k=inverse_k, dims=(-2, -1))
     return img_tensor
 
 
