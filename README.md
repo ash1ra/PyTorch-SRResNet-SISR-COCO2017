@@ -207,10 +207,10 @@ The results are compared against the original paper's SRResNet and the sgrvinod 
 **PSNR (dB) Comparison**
 | Dataset / Implementation | SRResNet (this project) | SRResNet (sgrvinod) | SRResNet (paper)
 | :--- | :---: | :---: | :---: |
-| **Set5** | 31.0983 | 31.927 | 32.05 |
-| **Set14** | 27.5783 | 28.588 | 28.49 |
-| **BSDS100** | 26.4378 | 27.587 | 27.58 |
-| **Urban100**| 25.3613 | — | — |
+| **Set5** | 31.1829 | 31.927 | 32.05 |
+| **Set14** | 26.2362 | 28.588 | 28.49 |
+| **BSDS100** | 24.9959 | 27.587 | 27.58 |
+| **Urban100**| 23.7773 | — | — |
 
 **SSIM Comparison**
 | Dataset / Implementation | SRResNet (this project) | SRResNet (sgrvinod) | SRResNet (paper)

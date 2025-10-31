@@ -45,7 +45,6 @@ def test_step(
     total_loss = 0.0
     total_psnr = 0.0
     total_ssim = 0.0
-    n_batches = len(data_loader)
 
     model.eval()
 
@@ -77,14 +76,19 @@ def test_step(
             y_hr_tensor = y_hr_tensor[:, :, sf:-sf, sf:-sf]
             y_sr_tensor = y_sr_tensor[:, :, sf:-sf, sf:-sf]
 
-            psnr = psnr_metric(y_sr_tensor, y_hr_tensor)
-            ssim = ssim_metric(y_sr_tensor, y_hr_tensor)
+            psnr_metric.update(y_sr_tensor, y_hr_tensor)  # type: ignore
+            ssim_metric.update(y_sr_tensor, y_hr_tensor)  # type: ignore
 
             total_loss += loss.item()
-            total_psnr += psnr.item()
-            total_ssim += ssim.item()
 
-    return total_loss / n_batches, total_psnr / n_batches, total_ssim / n_batches
+        total_loss /= len(data_loader)
+        total_psnr = psnr_metric.compute().item()  # type: ignore
+        total_ssim = ssim_metric.compute().item()  # type: ignore
+
+        psnr_metric.reset()
+        ssim_metric.reset()
+
+    return total_loss, total_psnr, total_ssim
 
 
 def main() -> None:
