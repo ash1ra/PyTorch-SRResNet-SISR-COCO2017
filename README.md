@@ -2,7 +2,7 @@
 
 This project implements a **SRResNet** (Super-Resolution Residual Network) model for **SISR** (Single Image Super-Resolution) task. The primary goal is to upscale low-resolution (LR) images by a given factor (2x, 4x, 8x) to produce super-resolution (SR) images with high fidelity and perceptual quality.
 
-This implementation is based on the paper [Photo-Realistic Single Image Super-Resolution Using a Generative Adversarial Network](https://arxiv.org/abs/1609.04802) and inspired by the [sgrvinod/a-PyTorch-Tutorial-to-Super-Resolution](https://github.com/sgrvinod/a-PyTorch-Tutorial-to-Super-Resolution) tutorial.
+This implementation is based on the paper [Photo-Realistic Single Image Super-Resolution Using a Generative Adversarial Network](https://arxiv.org/abs/1609.04802) and inspired by the [a-PyTorch-Tutorial-to-Super-Resolution](https://github.com/sgrvinod/a-PyTorch-Tutorial-to-Super-Resolution).
 
 ## Demonstration
 
@@ -12,21 +12,18 @@ The following images compare the standard bicubic interpolation with the output 
 
 ## Key Features
 
-- **Efficient Upsampling:** Uses **Sub-pixel Convolution (PixelShuffle)** instead of Transposed Convolution for cleaner upscaling and fewer artifacts.
-- **Fast Convergence:** Employs the **OneCycleLR** scheduler to accelerate training.
-- **Optimized Training:** Leverages **AMP (Automatic Mixed Precision)** for faster computation on compatible GPUs.
-- **Data Augmentation:** Applies random flips and rotations to training images to improve model generalization.
-- **Accurate Evaluation:**
-    * Uses **TTA (Test-Time Augmentation)** for more robust and accurate results during testing and inference.
-    * Calculates metrics (PSNR, SSIM) correctly on the **Y-channel** (luminance) after converting from RGB.
-    * Implements **side pixel cropping** (shaving) before metric calculation, which is a standard practice to avoid boundary effects.
-- **Robust Checkpointing:**
-    * Saves the model with the best PSNR score separately.
-    * Saves a checkpoint after every epoch.
-    * Safely saves the current state upon **Keyboard Interrupt (Ctrl+C)**.
-- **Comprehensive Logging:**
-    * Logs all training progress to both the console and a timestamped file in the `logs/` directory.
-    * Automatically generates and saves training plots (Loss, PSNR, SSIM, Learning Rate) upon completion.
+- Uses **Sub-pixel Convolution (PixelShuffle)** instead of Transposed Convolution for cleaner upscaling and fewer artifacts.
+- Employs the **OneCycleLR** scheduler to accelerate training.
+- Leverages **AMP (Automatic Mixed Precision)** for faster computation on compatible GPUs.
+- Applies random flips and rotations to training images to improve model generalization.
+- Uses **TTA (Test-Time Augmentation)** for more robust and accurate results during testing and inference.
+- Calculates metrics (PSNR, SSIM) correctly on the **Y-channel** (luminance) after converting from RGB.
+- Implements **side pixel cropping** (shaving) before metric calculation, which is a standard practice to avoid boundary effects.
+- Saves the model with the best PSNR score separately.
+- Saves a checkpoint after every epoch.
+- Safely saves the current state upon **Keyboard Interrupt (Ctrl+C)**.
+- Logs all training progress to both the console and a timestamped file in the `logs/` directory.
+- Automatically generates and saves training plots (Loss, PSNR, SSIM, Learning Rate) upon completion.
 
 ## Model Architecture
 
@@ -77,9 +74,17 @@ The following images compare the standard bicubic interpolation with the output 
 
 ## Datasets
 
-- **Training:** The model is trained on the **COCO 2017** (`2017 Train images [118K/18GB]`) dataset. The `data_processing.py` script dynamically creates LR images from HR images using bicubic downsampling and applies random crops and augmentations (flips, rotations).
-- **Validation:** A test dataset (`2017 Test images [41K/6GB]`) is used for validation instead of validation set (`2017 Val images [5K/1GB]`) because it contains more images.
-- **Testing:** The `test.py` script is configured to evaluate the trained model on standard benchmark datasets: **Set5**, **Set14**, **BSDS100**, and **Urban100**.
+### Training
+
+The model is trained on the **COCO 2017** (`2017 Train images [118K/18GB]`) dataset. The `data_processing.py` script dynamically creates LR images from HR images using bicubic downsampling and applies random crops and augmentations (flips, rotations).
+
+### Validation
+
+A test dataset (`2017 Test images [41K/6GB]`) is used for validation instead of validation set (`2017 Val images [5K/1GB]`) because it contains more images.
+
+### Testing
+
+The `test.py` script is configured to evaluate the trained model on standard benchmark datasets: **Set5**, **Set14**, **BSDS100**, and **Urban100**.
 
 ## Project Structure
 
@@ -120,8 +125,8 @@ Key settings in `train.py`:
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/ash1ra/SRResNet-SISR-COCO2017.git
-cd SRResNet-SISR-COCO2017
+git clone https://github.com/ash1ra/PyTorch-SRResNet-SISR-COCO2017.git
+cd PyTorch-SRResNet-SISR-COCO2017
 ```
 
 2. Create `.venv` and install dependencies:
@@ -235,8 +240,20 @@ The following images compare the standard bicubic interpolation with the output 
 ![Comparisson image 5](images/comparison_img_5.png)
 
 ## Acknowledgements
-- This project is heavily inspired by the excellent [a-PyTorch-Tutorial-to-Super-Resolution](https://github.com/sgrvinod/a-PyTorch-Tutorial-to-Super-Resolution) by sgrvinod.
-- Based on the paper: [Photo-Realistic Single Image Super-Resolution Using a Generative Adversarial Network](https://arxiv.org/abs/1609.04802).
+
+This project is heavily inspired by the excellent [a-PyTorch-Tutorial-to-Super-Resolution](https://github.com/sgrvinod/a-PyTorch-Tutorial-to-Super-Resolution) by [sgrvinod](https://github.com/sgrvinod), which is based on the paper [Photo-Realistic Single Image Super-Resolution Using a Generative Adversarial Network](https://arxiv.org/abs/1609.04802).
+
+```bibtex
+@misc{ledig2017photorealisticsingleimagesuperresolution,
+      title={Photo-Realistic Single Image Super-Resolution Using a Generative Adversarial Network}, 
+      author={Christian Ledig and Lucas Theis and Ferenc Huszar and Jose Caballero and Andrew Cunningham and Alejandro Acosta and Andrew Aitken and Alykhan Tejani and Johannes Totz and Zehan Wang and Wenzhe Shi},
+      year={2017},
+      eprint={1609.04802},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url={https://arxiv.org/abs/1609.04802}, 
+}
+```
 
 ## License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
